@@ -1,5 +1,6 @@
 import SnippetCard from "../components/SnippetCard";
 import EmptyState from "../components/EmptyState";
+import { matchesQuery, hasQuery } from "../lib/search";
 import type { Snippet } from "../types";
 
 interface SnippetsViewProps {
@@ -15,19 +16,12 @@ export default function SnippetsView({
   onToggleFavorite,
   onDelete,
 }: SnippetsViewProps) {
-  const q = query.trim().toLowerCase();
-  const visible = q
-    ? snippets.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.content.toLowerCase().includes(q),
-      )
-    : snippets;
+  const visible = snippets.filter((s) => matchesQuery(s, query));
 
   return (
     <section aria-label="Snippets">
       {visible.length === 0 ? (
-        q ? (
+        hasQuery(query) ? (
           <EmptyState
             glyph="⌕"
             title={`No matches for “${query.trim()}”`}

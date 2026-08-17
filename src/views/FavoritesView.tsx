@@ -1,5 +1,6 @@
 import SnippetCard from "../components/SnippetCard";
 import EmptyState from "../components/EmptyState";
+import { matchesQuery, hasQuery } from "../lib/search";
 import type { Snippet } from "../types";
 
 interface FavoritesViewProps {
@@ -15,20 +16,13 @@ export default function FavoritesView({
   onToggleFavorite,
   onDelete,
 }: FavoritesViewProps) {
-  const q = query.trim().toLowerCase();
   const favorites = snippets.filter((s) => s.favorite);
-  const visible = q
-    ? favorites.filter(
-        (s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.content.toLowerCase().includes(q),
-      )
-    : favorites;
+  const visible = favorites.filter((s) => matchesQuery(s, query));
 
   return (
     <section aria-label="Favorites">
       {visible.length === 0 ? (
-        q ? (
+        hasQuery(query) ? (
           <EmptyState
             glyph="⌕"
             title={`No matches for “${query.trim()}”`}
