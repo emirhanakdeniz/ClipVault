@@ -425,6 +425,30 @@ body {
   color: var(--brass);
 }
 
+.card__pin {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  opacity: 0.55;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px;
+  transition: opacity 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.card__pin:hover {
+  opacity: 1;
+  color: var(--steel);
+  transform: scale(1.15);
+}
+
+.card__pin--active {
+  opacity: 1;
+  color: var(--steel);
+}
+
 .card__actions {
   display: flex;
   align-items: center;
@@ -577,6 +601,7 @@ body {
 
   .sidebar__item,
   .card__star,
+  .card__pin,
   .card__copy,
   .searchbar {
     transition: none;

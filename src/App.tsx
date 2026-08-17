@@ -10,6 +10,7 @@ import {
   listSnippets,
   createSnippet,
   setFavorite,
+  setPinned,
   deleteSnippet,
 } from "./lib/api";
 
@@ -69,6 +70,18 @@ export default function App() {
     }
   }
 
+  async function togglePin(id: string) {
+    const current = snippets.find((s) => s.id === id);
+    if (!current) return;
+    try {
+      const updated = await setPinned(id, !current.pinned);
+      setSnippets((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      setError(null);
+    } catch (reason) {
+      setError(String(reason));
+    }
+  }
+
   async function handleDelete(id: string) {
     try {
       await deleteSnippet(id);
@@ -112,6 +125,7 @@ export default function App() {
               snippets={snippets}
               query={query}
               onToggleFavorite={toggleFavorite}
+              onTogglePin={togglePin}
               onDelete={handleDelete}
             />
           )}
@@ -120,6 +134,7 @@ export default function App() {
               snippets={snippets}
               query={query}
               onToggleFavorite={toggleFavorite}
+              onTogglePin={togglePin}
               onDelete={handleDelete}
             />
           )}

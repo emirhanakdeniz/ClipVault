@@ -26,11 +26,30 @@ pub fn init(app: &tauri::AppHandle) -> Result<Db, String> {
             content TEXT NOT NULL,
             type TEXT NOT NULL DEFAULT 'text',
             favorite INTEGER NOT NULL DEFAULT 0,
+            pinned INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         )",
         [],
     )
     .map_err(|e| e.to_string())?;
+    // Migration for databases created before the pinned column existed.
+    // CREATE TABLE IF NOT EXISTS does not evolve an existing schema, so add the
+    // column explicitly and tolerate the "duplicate column name" error.
+    let has_pinned = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('snippets') WHERE name = 'pinned'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|e| e.to_string())?
+        > 0;
+    if !has_pinned {
+        conn.execute(
+            "ALTER TABLE snippets ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     Ok(Db(Mutex::new(conn)))
 }

@@ -7,6 +7,7 @@ interface SnippetsViewProps {
   snippets: Snippet[];
   query: string;
   onToggleFavorite: (id: string) => void;
+  onTogglePin: (id: string) => void;
   onDelete: (id: string) => void;
 }
 
@@ -14,9 +15,16 @@ export default function SnippetsView({
   snippets,
   query,
   onToggleFavorite,
+  onTogglePin,
   onDelete,
 }: SnippetsViewProps) {
-  const visible = snippets.filter((s) => matchesQuery(s, query));
+  const matching = snippets.filter((s) => matchesQuery(s, query));
+  // Pinned snippets float to the top; relative order (created_at DESC) is
+  // preserved within each group via a stable partition.
+  const visible = [
+    ...matching.filter((s) => s.pinned),
+    ...matching.filter((s) => !s.pinned),
+  ];
 
   return (
     <section aria-label="Snippets">
@@ -41,6 +49,7 @@ export default function SnippetsView({
               key={snippet.id}
               snippet={snippet}
               onToggleFavorite={onToggleFavorite}
+              onTogglePin={onTogglePin}
               onDelete={onDelete}
               index={index}
             />

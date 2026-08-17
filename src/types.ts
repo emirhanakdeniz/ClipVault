@@ -6,6 +6,7 @@ export interface Snippet {
   content: string;
   type: SnippetType;
   favorite: boolean;
+  pinned: boolean;
   createdAt: number;
   updatedAt: number;
 }

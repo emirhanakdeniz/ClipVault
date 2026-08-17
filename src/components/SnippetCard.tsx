@@ -5,6 +5,7 @@ import { relativeTime } from "../lib/time";
 interface SnippetCardProps {
   snippet: Snippet;
   onToggleFavorite: (id: string) => void;
+  onTogglePin: (id: string) => void;
   onDelete: (id: string) => void;
   index: number;
 }
@@ -12,6 +13,7 @@ interface SnippetCardProps {
 export default function SnippetCard({
   snippet,
   onToggleFavorite,
+  onTogglePin,
   onDelete,
   index,
 }: SnippetCardProps) {
@@ -42,6 +44,21 @@ export default function SnippetCard({
       <header className="card__header">
         <h3 className="card__title">{snippet.title}</h3>
         <div className="card__actions">
+          <button
+            type="button"
+            className={
+              snippet.pinned ? "card__pin card__pin--active" : "card__pin"
+            }
+            onClick={() => onTogglePin(snippet.id)}
+            aria-label={
+              snippet.pinned
+                ? `Unpin ${snippet.title}`
+                : `Pin ${snippet.title}`
+            }
+            aria-pressed={snippet.pinned}
+          >
+            📌
+          </button>
           <button
             type="button"
             className={

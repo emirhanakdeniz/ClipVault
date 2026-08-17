@@ -14,6 +14,7 @@ pub struct Snippet {
     #[serde(rename = "type")]
     pub snippet_type: String,
     pub favorite: bool,
+    pub pinned: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -25,6 +26,7 @@ fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
         content: row.get(2)?,
         snippet_type: row.get(3)?,
         favorite: row.get::<_, i64>(4)? != 0,
+        pinned: row.get::<_, i64>(7)? != 0,
         created_at: row.get(5)?,
         updated_at: row.get(6)?,
     })
@@ -32,7 +34,7 @@ fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
 
 fn fetch_snippet(conn: &Connection, id: &str) -> Result<Snippet, String> {
     conn.query_row(
-        "SELECT id, title, content, type, favorite, created_at, updated_at
+        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned
          FROM snippets WHERE id = ?1",
         params![id],
         row_to_snippet,
@@ -45,7 +47,7 @@ pub fn list_snippets(db: State<'_, Db>) -> Result<Vec<Snippet>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at
+            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned
              FROM snippets ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -70,19 +72,21 @@ pub fn create_snippet(
         content,
         snippet_type,
         favorite: false,
+        pinned: false,
         created_at: now,
         updated_at: now,
     };
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO snippets (id, title, content, type, favorite, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT INTO snippets (id, title, content, type, favorite, pinned, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         params![
             snippet.id,
             snippet.title,
             snippet.content,
             snippet.snippet_type,
             snippet.favorite as i64,
+            snippet.pinned as i64,
             now,
             now
         ],
@@ -118,6 +122,21 @@ pub fn set_favorite(db: State<'_, Db>, id: String, favorite: bool) -> Result<Sni
         .execute(
             "UPDATE snippets SET favorite = ?1, updated_at = ?2 WHERE id = ?3",
             params![favorite as i64, now_ms(), id],
+        )
+        .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err(format!("snippet {id} not found"));
+    }
+    fetch_snippet(&conn, &id)
+}
+
+#[tauri::command]
+pub fn set_pinned(db: State<'_, Db>, id: String, pinned: bool) -> Result<Snippet, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let changed = conn
+        .execute(
+            "UPDATE snippets SET pinned = ?1, updated_at = ?2 WHERE id = ?3",
+            params![pinned as i64, now_ms(), id],
         )
         .map_err(|e| e.to_string())?;
     if changed == 0 {
