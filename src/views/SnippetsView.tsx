@@ -1,11 +1,56 @@
-export default function SnippetsView() {
+import SnippetCard from "../components/SnippetCard";
+import EmptyState from "../components/EmptyState";
+import type { Snippet } from "../types";
+
+interface SnippetsViewProps {
+  snippets: Snippet[];
+  query: string;
+  onToggleFavorite: (id: string) => void;
+}
+
+export default function SnippetsView({
+  snippets,
+  query,
+  onToggleFavorite,
+}: SnippetsViewProps) {
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? snippets.filter(
+        (s) =>
+          s.title.toLowerCase().includes(q) ||
+          s.content.toLowerCase().includes(q),
+      )
+    : snippets;
+
   return (
-    <div className="view">
-      <h1 className="view__title">Snippets</h1>
-      <div className="empty-state">
-        <span className="empty-state__icon">&#128203;</span>
-        <span className="empty-state__text">No snippets yet</span>
-      </div>
-    </div>
+    <section aria-label="Snippets">
+      {visible.length === 0 ? (
+        q ? (
+          <EmptyState
+            glyph="⌕"
+            title={`No matches for “${query.trim()}”`}
+            hint="Check the spelling, or clear the search."
+          />
+        ) : (
+          <EmptyState
+            glyph="▤"
+            title="Nothing saved yet"
+            hint="Copied snippets will land here."
+          />
+        )
+      ) : (
+        <div className="grid">
+          {visible.map((snippet, index) => (
+            <SnippetCard
+              key={snippet.id}
+              snippet={snippet}
+              onToggleFavorite={onToggleFavorite}
+              index={index}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
+
