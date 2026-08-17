@@ -6,12 +6,14 @@ interface FavoritesViewProps {
   snippets: Snippet[];
   query: string;
   onToggleFavorite: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export default function FavoritesView({
   snippets,
   query,
   onToggleFavorite,
+  onDelete,
 }: FavoritesViewProps) {
   const q = query.trim().toLowerCase();
   const favorites = snippets.filter((s) => s.favorite);
@@ -46,6 +48,7 @@ export default function FavoritesView({
               key={snippet.id}
               snippet={snippet}
               onToggleFavorite={onToggleFavorite}
+              onDelete={onDelete}
               index={index}
             />
           ))}

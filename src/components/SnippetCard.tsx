@@ -5,12 +5,14 @@ import { relativeTime } from "../lib/time";
 interface SnippetCardProps {
   snippet: Snippet;
   onToggleFavorite: (id: string) => void;
+  onDelete: (id: string) => void;
   index: number;
 }
 
 export default function SnippetCard({
   snippet,
   onToggleFavorite,
+  onDelete,
   index,
 }: SnippetCardProps) {
   const [copied, setCopied] = useState(false);
@@ -39,23 +41,33 @@ export default function SnippetCard({
     >
       <header className="card__header">
         <h3 className="card__title">{snippet.title}</h3>
-        <button
-          type="button"
-          className={
-            snippet.favorite
-              ? "card__star card__star--active"
-              : "card__star"
-          }
-          onClick={() => onToggleFavorite(snippet.id)}
-          aria-label={
-            snippet.favorite
-              ? `Remove ${snippet.title} from favorites`
-              : `Add ${snippet.title} to favorites`
-          }
-          aria-pressed={snippet.favorite}
-        >
-          ★
-        </button>
+        <div className="card__actions">
+          <button
+            type="button"
+            className={
+              snippet.favorite
+                ? "card__star card__star--active"
+                : "card__star"
+            }
+            onClick={() => onToggleFavorite(snippet.id)}
+            aria-label={
+              snippet.favorite
+                ? `Remove ${snippet.title} from favorites`
+                : `Add ${snippet.title} to favorites`
+            }
+            aria-pressed={snippet.favorite}
+          >
+            ★
+          </button>
+          <button
+            type="button"
+            className="card__delete"
+            onClick={() => onDelete(snippet.id)}
+            aria-label={`Delete ${snippet.title}`}
+          >
+            ×
+          </button>
+        </div>
       </header>
       <pre className="card__preview">{snippet.content}</pre>
       <footer className="card__meta">
@@ -76,3 +88,4 @@ export default function SnippetCard({
     </article>
   );
 }
+

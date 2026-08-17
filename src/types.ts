@@ -7,4 +7,6 @@ export interface Snippet {
   type: SnippetType;
   favorite: boolean;
   createdAt: number;
+  updatedAt: number;
 }
+

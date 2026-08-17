@@ -6,12 +6,14 @@ interface SnippetsViewProps {
   snippets: Snippet[];
   query: string;
   onToggleFavorite: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
 export default function SnippetsView({
   snippets,
   query,
   onToggleFavorite,
+  onDelete,
 }: SnippetsViewProps) {
   const q = query.trim().toLowerCase();
   const visible = q
@@ -35,7 +37,7 @@ export default function SnippetsView({
           <EmptyState
             glyph="▤"
             title="Nothing saved yet"
-            hint="Copied snippets will land here."
+            hint="Save your first snippet with + New."
           />
         )
       ) : (
@@ -45,6 +47,7 @@ export default function SnippetsView({
               key={snippet.id}
               snippet={snippet}
               onToggleFavorite={onToggleFavorite}
+              onDelete={onDelete}
               index={index}
             />
           ))}
