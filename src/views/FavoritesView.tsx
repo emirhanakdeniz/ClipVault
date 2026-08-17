@@ -1,11 +1,13 @@
 import SnippetCard from "../components/SnippetCard";
 import EmptyState from "../components/EmptyState";
-import { matchesQuery, hasQuery } from "../lib/search";
+import { getVisibleSnippets, hasQuery } from "../lib/search";
 import type { Snippet } from "../types";
 
 interface FavoritesViewProps {
   snippets: Snippet[];
   query: string;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
   onDelete: (id: string) => void;
@@ -14,18 +16,13 @@ interface FavoritesViewProps {
 export default function FavoritesView({
   snippets,
   query,
+  selectedId,
+  onSelect,
   onToggleFavorite,
   onTogglePin,
   onDelete,
 }: FavoritesViewProps) {
-  const favorites = snippets.filter((s) => s.favorite);
-  const matching = favorites.filter((s) => matchesQuery(s, query));
-  // Pinned snippets float to the top; relative order (created_at DESC) is
-  // preserved within each group via a stable partition.
-  const visible = [
-    ...matching.filter((s) => s.pinned),
-    ...matching.filter((s) => !s.pinned),
-  ];
+  const visible = getVisibleSnippets(snippets, query, { favoritesOnly: true });
 
   return (
     <section aria-label="Favorites">
@@ -49,6 +46,8 @@ export default function FavoritesView({
             <SnippetCard
               key={snippet.id}
               snippet={snippet}
+              selected={snippet.id === selectedId}
+              onSelect={onSelect}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
               onDelete={onDelete}

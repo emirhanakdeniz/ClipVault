@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import NewSnippetForm from "./components/NewSnippetForm";
@@ -13,6 +13,9 @@ import {
   setPinned,
   deleteSnippet,
 } from "./lib/api";
+import { getVisibleSnippets } from "./lib/search";
+import { copyText } from "./lib/clipboard";
+import useShortcuts from "./hooks/useShortcuts";
 
 export default function App() {
   const [activeView, setActiveView] = useState<ViewId>("snippets");
@@ -20,19 +23,18 @@ export default function App() {
   const [snippets, setSnippets] = useState<Snippet[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const favoriteCount = snippets.filter((s) => s.favorite).length;
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        document.querySelector<HTMLInputElement>(".searchbar__input")?.focus();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  // Same list the active view renders; keeps keyboard selection in sync.
+  const visible = useMemo(
+    () =>
+      getVisibleSnippets(snippets, query, {
+        favoritesOnly: activeView === "favorites",
+      }),
+    [snippets, query, activeView],
+  );
 
   useEffect(() => {
     listSnippets()
@@ -86,11 +88,44 @@ export default function App() {
     try {
       await deleteSnippet(id);
       setSnippets((prev) => prev.filter((s) => s.id !== id));
+      setSelectedId((prev) => (prev === id ? null : prev));
       setError(null);
     } catch (reason) {
       setError(String(reason));
     }
   }
+
+  function selectNext() {
+    if (visible.length === 0) return;
+    const index = visible.findIndex((s) => s.id === selectedId);
+    const next = index === -1 ? 0 : Math.min(index + 1, visible.length - 1);
+    setSelectedId(visible[next].id);
+  }
+
+  function selectPrevious() {
+    if (visible.length === 0) return;
+    const index = visible.findIndex((s) => s.id === selectedId);
+    setSelectedId(visible[index <= 0 ? 0 : index - 1].id);
+  }
+
+  async function copySelected() {
+    const current = visible.find((s) => s.id === selectedId);
+    if (!current) return;
+    await copyText(current.content);
+  }
+
+  useShortcuts({
+    focusSearch: () =>
+      document.querySelector<HTMLInputElement>(".searchbar__input")?.focus(),
+    newSnippet: () => setShowForm((open) => !open),
+    copySelected,
+    toggleFavorite: () => {
+      if (selectedId) toggleFavorite(selectedId);
+    },
+    selectPrevious,
+    selectNext,
+    clearSelection: () => setSelectedId(null),
+  });
 
   return (
     <div className="app">
@@ -107,6 +142,7 @@ export default function App() {
             className="toolbar__new"
             type="button"
             onClick={() => setShowForm((visible) => !visible)}
+            title="New snippet (Ctrl+N)"
           >
             + New
           </button>
@@ -124,6 +160,8 @@ export default function App() {
             <SnippetsView
               snippets={snippets}
               query={query}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
               onDelete={handleDelete}
@@ -133,6 +171,8 @@ export default function App() {
             <FavoritesView
               snippets={snippets}
               query={query}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
               onDelete={handleDelete}

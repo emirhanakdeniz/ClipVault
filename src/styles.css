@@ -401,6 +401,11 @@ body {
   text-overflow: ellipsis;
 }
 
+.card--selected {
+  border-color: var(--steel);
+  box-shadow: 0 0 0 3px rgba(111, 157, 196, 0.18);
+}
+
 .card__star {
   flex-shrink: 0;
   border: none;

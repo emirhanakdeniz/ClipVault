@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import type { Snippet } from "../types";
 import { relativeTime } from "../lib/time";
+import { copyText } from "../lib/clipboard";
 
 interface SnippetCardProps {
   snippet: Snippet;
+  selected?: boolean;
+  onSelect?: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
   onDelete: (id: string) => void;
@@ -12,6 +15,8 @@ interface SnippetCardProps {
 
 export default function SnippetCard({
   snippet,
+  selected = false,
+  onSelect,
   onToggleFavorite,
   onTogglePin,
   onDelete,
@@ -25,21 +30,22 @@ export default function SnippetCard({
   }, []);
 
   function handleCopy() {
-    navigator.clipboard
-      .writeText(snippet.content)
-      .then(() => {
-        setCopied(true);
-        timer.current = window.setTimeout(() => setCopied(false), 1500);
-      })
-      .catch(() => {
-        // Clipboard access denied (e.g. non-secure context); no-op in mock phase.
-      });
+    copyText(snippet.content).then((ok) => {
+      if (!ok) {
+        // Clipboard access denied (e.g. non-secure context); no-op.
+        return;
+      }
+      setCopied(true);
+      timer.current = window.setTimeout(() => setCopied(false), 1500);
+    });
   }
 
   return (
     <article
-      className={`card card--${snippet.type}`}
+      className={`card card--${snippet.type}${selected ? " card--selected" : ""}`}
       style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+      tabIndex={0}
+      onClick={() => onSelect?.(snippet.id)}
     >
       <header className="card__header">
         <h3 className="card__title">{snippet.title}</h3>

@@ -13,7 +13,29 @@ export function matchesQuery(snippet: Snippet, query: string): boolean {
   );
 }
 
-/** True when the query contains non-whitespace characters. */
+/**
+ * True when the query contains non-whitespace characters. */
 export function hasQuery(query: string): boolean {
   return query.trim().length > 0;
+}
+
+/**
+ * The single source of truth for which snippets a view shows:
+ * view filtering (optionally favorites only), search matching, and the
+ * pinned-first ordering. Used by both views for rendering and by App
+ * for keyboard selection so they can never disagree.
+ */
+export function getVisibleSnippets(
+  snippets: Snippet[],
+  query: string,
+  options?: { favoritesOnly?: boolean },
+): Snippet[] {
+  const base = options?.favoritesOnly
+    ? snippets.filter((s) => s.favorite)
+    : snippets;
+  const matching = base.filter((s) => matchesQuery(s, query));
+  return [
+    ...matching.filter((s) => s.pinned),
+    ...matching.filter((s) => !s.pinned),
+  ];
 }
