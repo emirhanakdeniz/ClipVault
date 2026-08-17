@@ -8,5 +8,10 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      // Cargo locks files under src-tauri/target while linking the app exe;
+      // watching them crashes Vite with EBUSY on Windows.
+      ignored: ["**/src-tauri/**"],
+    },
   },
 });
