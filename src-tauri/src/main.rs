@@ -10,6 +10,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .setup(|app| {
             let database = db::init(app.handle())?;
             app.manage(database);
@@ -27,6 +28,8 @@ fn main() {
             commands::import_snippets,
             commands::get_setting,
             commands::set_setting,
+            commands::capture_clipboard,
+            commands::prune_clipboard_history,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

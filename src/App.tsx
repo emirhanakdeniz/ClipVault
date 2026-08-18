@@ -29,7 +29,9 @@ import { copyText } from "./lib/clipboard";
 import { findDuplicate } from "./lib/duplicates";
 import useShortcuts from "./hooks/useShortcuts";
 import useGlobalQuickCapture from "./hooks/useGlobalQuickCapture";
+import useClipboardHistory from "./hooks/useClipboardHistory";
 import ShortcutSettings from "./components/ShortcutSettings";
+import ClipboardHistorySettings from "./components/ClipboardHistorySettings";
 
 export default function App() {
   const [activeView, setActiveView] = useState<ViewId>("snippets");
@@ -313,6 +315,24 @@ export default function App() {
       ?.focus(),
   );
 
+  // Automatic clipboard capture with a configurable history limit. The
+  // backend prunes oldest auto-captured entries; manual/favorite/pinned
+  // snippets are never removed automatically.
+  const clipboardHistory = useClipboardHistory({
+    onCapture: (captured) => {
+      setSnippets((prev) => [captured, ...prev]);
+      setError(null);
+    },
+    onRemove: (removedIds) => {
+      const removed = new Set(removedIds);
+      setSnippets((prev) => prev.filter((s) => !removed.has(s.id)));
+      setSelectedId((current) =>
+        current && removed.has(current) ? null : current,
+      );
+      setBulkIds((prev) => prev.filter((id) => !removed.has(id)));
+    },
+  });
+
   // The snippet being edited. Keyed by id so the editor's draft resets only
   // when a different snippet is selected — never when this prop refreshes.
   const editing = snippets.find((s) => s.id === selectedId) ?? null;
@@ -332,12 +352,18 @@ export default function App() {
         onExport={handleExport}
         onImport={handleImport}
         footerExtra={
-          <ShortcutSettings
-            setting={globalQuickCapture.setting}
-            status={globalQuickCapture.status}
-            message={globalQuickCapture.message}
-            onChange={globalQuickCapture.update}
-          />
+          <>
+            <ShortcutSettings
+              setting={globalQuickCapture.setting}
+              status={globalQuickCapture.status}
+              message={globalQuickCapture.message}
+              onChange={globalQuickCapture.update}
+            />
+            <ClipboardHistorySettings
+              setting={clipboardHistory.setting}
+              onChange={clipboardHistory.update}
+            />
+          </>
         }
       />
       <main className="content">

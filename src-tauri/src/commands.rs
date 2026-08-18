@@ -1,6 +1,6 @@
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use tauri::State;
+use tauri::{AppHandle, State};
 use uuid::Uuid;
 
 use crate::db::{now_ms, Db};
@@ -19,6 +19,13 @@ pub struct Snippet {
     pub tags: Vec<String>,
     pub created_at: i64,
     pub updated_at: i64,
+    /// "manual" (created by the user) or "clipboard" (auto-captured).
+    #[serde(default = "default_source")]
+    pub source: String,
+}
+
+fn default_source() -> String {
+    "manual".to_string()
 }
 
 /// Decodes the tags column (a JSON array string) into a Vec<String>. A stored
@@ -39,12 +46,13 @@ fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
         tags: decode_tags(row.get(9)?),
         created_at: row.get(5)?,
         updated_at: row.get(6)?,
+        source: row.get(10)?,
     })
 }
 
 fn fetch_snippet(conn: &Connection, id: &str) -> Result<Snippet, String> {
     conn.query_row(
-        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags
+        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source
          FROM snippets WHERE id = ?1",
         params![id],
         row_to_snippet,
@@ -57,7 +65,7 @@ pub fn list_snippets(db: State<'_, Db>) -> Result<Vec<Snippet>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags
+            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source
              FROM snippets ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -88,6 +96,7 @@ pub fn create_snippet(
         tags: tags.unwrap_or_default(),
         created_at: now,
         updated_at: now,
+        source: default_source(),
     };
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
@@ -252,7 +261,7 @@ pub fn export_snippets(db: State<'_, Db>, path: String) -> Result<usize, String>
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags
+            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source
              FROM snippets ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -456,4 +465,204 @@ pub fn set_setting(db: State<'_, Db>, key: String, value: String) -> Result<(), 
     )
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// ---------- Automatic clipboard history ----------
+
+const CLIPBOARD_SETTING_KEY: &str = "clipboardHistory";
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[serde(rename_all = "camelCase")]
+struct ClipboardHistorySetting {
+    enabled: bool,
+    limit: usize,
+}
+
+impl Default for ClipboardHistorySetting {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            limit: 100,
+        }
+    }
+}
+
+fn read_clipboard_setting(conn: &Connection) -> ClipboardHistorySetting {
+    conn.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        params![CLIPBOARD_SETTING_KEY],
+        |row| row.get::<_, String>(0),
+    )
+    .ok()
+    .and_then(|raw| serde_json::from_str(&raw).ok())
+    .unwrap_or_default()
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureOutcome {
+    /// The snippet captured this round, if the clipboard changed.
+    pub created: Option<Snippet>,
+    /// Clipboard entries removed by the limit, if any.
+    pub removed_ids: Vec<String>,
+    /// False when capture is disabled; the frontend then skips state updates.
+    pub enabled: bool,
+}
+
+/// Shortens the first non-empty line of captured text into a title.
+fn title_from_content(content: &str) -> String {
+    let first_line = content
+        .lines()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("Clipboard entry");
+    let mut title: String = first_line.chars().take(60).collect();
+    if first_line.chars().count() > 60 {
+        title.push('…');
+    }
+    title
+}
+
+/// Deletes the oldest auto-captured entries that exceed `limit`.
+/// Manual snippets and favorites/pinned entries are never touched; when all
+/// remaining captured entries are protected the prune is best-effort.
+fn prune_clipboard_entries(conn: &Connection, limit: usize) -> Result<Vec<String>, String> {
+    let total: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM snippets WHERE source = 'clipboard'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    let excess = (total as usize).saturating_sub(limit);
+    if excess == 0 {
+        return Ok(Vec::new());
+    }
+    let removed: Vec<String> = {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id FROM snippets
+                 WHERE source = 'clipboard' AND favorite = 0 AND pinned = 0
+                 ORDER BY created_at ASC, id ASC
+                 LIMIT ?1",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map(params![excess as i64], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())?
+    };
+    for id in &removed {
+        conn.execute("DELETE FROM snippets WHERE id = ?1", params![id])
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(removed)
+}
+
+/// Poll target for the frontend: reads the system clipboard, stores new text
+/// as a "clipboard" snippet (skipping duplicates and empty text), then prunes
+/// auto-captured entries over the configured limit.
+#[tauri::command]
+pub fn capture_clipboard(
+    app: AppHandle,
+    db: State<'_, Db>,
+) -> Result<CaptureOutcome, String> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let setting = read_clipboard_setting(&conn);
+    if !setting.enabled {
+        return Ok(CaptureOutcome {
+            created: None,
+            removed_ids: Vec::new(),
+            enabled: false,
+        });
+    }
+
+    let text = app.clipboard().read_text().map_err(|e| e.to_string())?;
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        let removed_ids = prune_clipboard_entries(&conn, setting.limit)?;
+        return Ok(CaptureOutcome {
+            created: None,
+            removed_ids,
+            enabled: true,
+        });
+    }
+
+    // Same whitespace-normalized duplicate rule as manual creation/import.
+    let normalized = normalize_content(trimmed);
+    let duplicate = {
+        let mut stmt = conn
+            .prepare("SELECT id, content FROM snippets")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| e.to_string())?;
+        let duplicate = rows
+            .into_iter()
+            .any(|row| {
+                row.map(|(_, content)| normalize_content(&content) == normalized)
+                    .unwrap_or(false)
+            });
+        duplicate
+    };
+    if duplicate {
+        let removed_ids = prune_clipboard_entries(&conn, setting.limit)?;
+        return Ok(CaptureOutcome {
+            created: None,
+            removed_ids,
+            enabled: true,
+        });
+    }
+
+    let now = now_ms();
+    let snippet = Snippet {
+        id: Uuid::new_v4().to_string(),
+        title: title_from_content(trimmed),
+        content: trimmed.to_string(),
+        snippet_type: "text".to_string(),
+        favorite: false,
+        pinned: false,
+        archived: false,
+        tags: Vec::new(),
+        created_at: now,
+        updated_at: now,
+        source: "clipboard".to_string(),
+    };
+    conn.execute(
+        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        params![
+            snippet.id,
+            snippet.title,
+            snippet.content,
+            snippet.snippet_type,
+            snippet.favorite as i64,
+            snippet.pinned as i64,
+            snippet.archived as i64,
+            serde_json::to_string(&snippet.tags).map_err(|e| e.to_string())?,
+            now,
+            now,
+            snippet.source
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+    let removed_ids = prune_clipboard_entries(&conn, setting.limit)?;
+    Ok(CaptureOutcome {
+        created: Some(snippet),
+        removed_ids,
+        enabled: true,
+    })
+}
+
+/// Trims existing auto-captured history down to the configured limit. Called
+/// by the frontend right after the limit setting changes.
+#[tauri::command]
+pub fn prune_clipboard_history(db: State<'_, Db>) -> Result<Vec<String>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let setting = read_clipboard_setting(&conn);
+    prune_clipboard_entries(&conn, setting.limit)
 }

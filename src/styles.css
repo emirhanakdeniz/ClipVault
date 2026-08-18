@@ -250,6 +250,58 @@ body {
   color: var(--brass);
 }
 
+/* ---------- Clipboard history settings ---------- */
+.clip-history {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.clip-history__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.clip-history__limit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.clip-history__select {
+  padding: 2px 4px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--panel-raised);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.clip-history__select:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.clip-history__hint {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
 /* ---------- Content ---------- */
 .content {
   flex: 1;

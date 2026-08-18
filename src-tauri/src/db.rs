@@ -85,6 +85,23 @@ pub fn init(app: &tauri::AppHandle) -> Result<Db, String> {
         )
         .map_err(|e| e.to_string())?;
     }
+    // Same migration pattern for the source column ("manual" vs "clipboard"),
+    // used by automatic clipboard capture. Existing rows default to "manual".
+    let has_source = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('snippets') WHERE name = 'source'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|e| e.to_string())?
+        > 0;
+    if !has_source {
+        conn.execute(
+            "ALTER TABLE snippets ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     // Generic key/value settings store (e.g. global shortcut preferences).
     conn.execute(
         "CREATE TABLE IF NOT EXISTS settings (

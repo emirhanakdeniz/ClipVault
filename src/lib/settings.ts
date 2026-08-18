@@ -48,6 +48,55 @@ export async function saveQuickCaptureShortcut(
   });
 }
 
+// ---------- Clipboard history ----------
+
+const CLIPBOARD_KEY = "clipboardHistory";
+
+export interface ClipboardHistorySetting {
+  enabled: boolean;
+  /** Maximum number of auto-captured entries kept. */
+  limit: number;
+}
+
+/** Off by default; 100 captured entries when enabled. */
+export const DEFAULT_CLIPBOARD_HISTORY: ClipboardHistorySetting = {
+  enabled: false,
+  limit: 100,
+};
+
+/** Limit choices offered in the settings UI. */
+export const CLIPBOARD_LIMIT_CHOICES = [25, 50, 100, 200, 500];
+
+export async function loadClipboardHistory(): Promise<ClipboardHistorySetting> {
+  try {
+    const raw = await invoke<string | null>("get_setting", {
+      key: CLIPBOARD_KEY,
+    });
+    if (!raw) return DEFAULT_CLIPBOARD_HISTORY;
+    const parsed = JSON.parse(raw) as Partial<ClipboardHistorySetting>;
+    if (
+      typeof parsed.enabled !== "boolean" ||
+      typeof parsed.limit !== "number" ||
+      !Number.isFinite(parsed.limit)
+    ) {
+      return DEFAULT_CLIPBOARD_HISTORY;
+    }
+    return { enabled: parsed.enabled, limit: parsed.limit };
+  } catch {
+    // Unreadable settings must never block startup; fall back to defaults.
+    return DEFAULT_CLIPBOARD_HISTORY;
+  }
+}
+
+export async function saveClipboardHistory(
+  setting: ClipboardHistorySetting,
+): Promise<void> {
+  await invoke("set_setting", {
+    key: CLIPBOARD_KEY,
+    value: JSON.stringify(setting),
+  });
+}
+
 /**
  * Converts a frontend-style combo into a Tauri accelerator string. "Ctrl"
  * becomes the platform primary modifier (Command on macOS) so the same combo
