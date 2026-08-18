@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import NewSnippetForm from "./components/NewSnippetForm";
+import SnippetEditor from "./components/SnippetEditor";
 import SnippetsView from "./views/SnippetsView";
 import FavoritesView from "./views/FavoritesView";
 import ArchiveView from "./views/ArchiveView";
@@ -12,6 +13,7 @@ import type { Snippet, SnippetType } from "./types";
 import {
   listSnippets,
   createSnippet,
+  updateSnippet,
   setFavorite,
   setPinned,
   setArchived,
@@ -107,6 +109,22 @@ export default function App() {
       setError(null);
     } catch (reason) {
       setError(String(reason));
+    }
+  }
+
+  async function handleUpdate(
+    id: string,
+    title: string,
+    content: string,
+  ): Promise<Snippet> {
+    try {
+      const updated = await updateSnippet(id, title, content);
+      setSnippets((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      setError(null);
+      return updated;
+    } catch (reason) {
+      setError(String(reason));
+      throw reason;
     }
   }
 
@@ -278,6 +296,10 @@ export default function App() {
     },
   });
 
+  // The snippet being edited. Keyed by id so the editor's draft resets only
+  // when a different snippet is selected — never when this prop refreshes.
+  const editing = snippets.find((s) => s.id === selectedId) ?? null;
+
   return (
     <div className="app">
       <Sidebar
@@ -315,6 +337,14 @@ export default function App() {
               setShowForm(false);
               setDuplicateNotice(null);
             }}
+          />
+        )}
+        {editing && (
+          <SnippetEditor
+            key={editing.id}
+            snippet={editing}
+            onSave={handleUpdate}
+            onClose={() => setSelectedId(null)}
           />
         )}
         {statusNotice && (
