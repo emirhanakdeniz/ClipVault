@@ -8,6 +8,7 @@ export interface Snippet {
   favorite: boolean;
   pinned: boolean;
   archived: boolean;
+  tags: string[];
   createdAt: number;
   updatedAt: number;
 }

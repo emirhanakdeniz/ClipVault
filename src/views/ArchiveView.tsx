@@ -1,11 +1,13 @@
 import SnippetCard from "../components/SnippetCard";
 import EmptyState from "../components/EmptyState";
 import { getVisibleSnippets, hasQuery } from "../lib/search";
+import type { SnippetFilters } from "../lib/search";
 import type { Snippet } from "../types";
 
 interface ArchiveViewProps {
   snippets: Snippet[];
   query: string;
+  filters: SnippetFilters;
   selectedId: string | null;
   onSelect: (id: string) => void;
   bulkIds: string[];
@@ -19,6 +21,7 @@ interface ArchiveViewProps {
 export default function ArchiveView({
   snippets,
   query,
+  filters,
   selectedId,
   onSelect,
   bulkIds,
@@ -28,7 +31,10 @@ export default function ArchiveView({
   onRestore,
   onDelete,
 }: ArchiveViewProps) {
-  const visible = getVisibleSnippets(snippets, query, { archivedOnly: true });
+  const visible = getVisibleSnippets(snippets, query, {
+    archivedOnly: true,
+    filters,
+  });
 
   return (
     <section aria-label="Archive">

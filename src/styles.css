@@ -203,6 +203,62 @@ body {
   color: var(--brass);
 }
 
+/* ---------- Filter bar ---------- */
+.filterbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 24px 0;
+}
+
+.filterbar__chip,
+.filterbar__select {
+  padding: 4px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background-color: var(--panel);
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease,
+    background-color 120ms ease;
+}
+
+.filterbar__chip:hover,
+.filterbar__select:hover {
+  border-color: var(--brass);
+  color: var(--brass);
+}
+
+.filterbar__chip--active,
+.filterbar__chip--active:hover {
+  border-color: var(--brass);
+  background-color: var(--brass-dim);
+  color: var(--brass);
+}
+
+.filterbar__select {
+  border-radius: 8px;
+  appearance: none;
+}
+
+.filterbar__clear {
+  padding: 4px 6px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.filterbar__clear:hover {
+  color: var(--brass);
+}
+
 /* ---------- Search bar (signature) ---------- */
 .searchbar {
   display: flex;
@@ -632,6 +688,14 @@ body {
 .card__type--link {
   color: var(--violet);
   border-color: rgba(157, 148, 196, 0.35);
+}
+
+.card__tag {
+  padding: 1px 6px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--steel);
+  font-size: 10.5px;
 }
 
 .card__time {

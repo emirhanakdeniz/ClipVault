@@ -6,6 +6,7 @@ import SnippetsView from "./views/SnippetsView";
 import FavoritesView from "./views/FavoritesView";
 import ArchiveView from "./views/ArchiveView";
 import BulkActionBar from "./components/BulkActionBar";
+import FilterBar from "./components/FilterBar";
 import type { ViewId } from "./components/Sidebar";
 import type { Snippet, SnippetType } from "./types";
 import {
@@ -20,6 +21,7 @@ import {
 } from "./lib/api";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { getVisibleSnippets } from "./lib/search";
+import type { SnippetFilters } from "./lib/search";
 import { copyText } from "./lib/clipboard";
 import { findDuplicate } from "./lib/duplicates";
 import useShortcuts from "./hooks/useShortcuts";
@@ -32,6 +34,7 @@ export default function App() {
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bulkIds, setBulkIds] = useState<string[]>([]);
+  const [filters, setFilters] = useState<SnippetFilters>({});
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
   const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
@@ -45,8 +48,18 @@ export default function App() {
       getVisibleSnippets(snippets, query, {
         favoritesOnly: activeView === "favorites",
         archivedOnly: activeView === "archive",
+        filters,
       }),
-    [snippets, query, activeView],
+    [snippets, query, activeView, filters],
+  );
+
+  // Unique tags across all snippets, for the tag filter dropdown.
+  const allTags = useMemo(
+    () =>
+      [...new Set(snippets.flatMap((s) => s.tags))].sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [snippets],
   );
 
   useEffect(() => {
@@ -62,6 +75,7 @@ export default function App() {
     title: string;
     content: string;
     type: SnippetType;
+    tags?: string[];
   }) {
     // Prevent accidental duplicates (whitespace-normalized comparison).
     // Existing snippets are never deleted or merged; the form stays open so
@@ -271,6 +285,7 @@ export default function App() {
         onSelect={(view) => {
           setActiveView(view);
           setBulkIds([]);
+          setFilters({});
         }}
         snippetCount={active.length}
         favoriteCount={favoriteCount}
@@ -290,6 +305,7 @@ export default function App() {
             + New
           </button>
         </div>
+        <FilterBar view={activeView} filters={filters} tags={allTags} onChange={setFilters} />
         {showForm && (
           <NewSnippetForm
             onCreate={handleCreate}
@@ -325,6 +341,7 @@ export default function App() {
             <SnippetsView
               snippets={snippets}
               query={query}
+              filters={filters}
               selectedId={selectedId}
               onSelect={setSelectedId}
               bulkIds={bulkIds}
@@ -338,6 +355,7 @@ export default function App() {
             <FavoritesView
               snippets={snippets}
               query={query}
+              filters={filters}
               selectedId={selectedId}
               onSelect={setSelectedId}
               bulkIds={bulkIds}
@@ -351,6 +369,7 @@ export default function App() {
             <ArchiveView
               snippets={snippets}
               query={query}
+              filters={filters}
               selectedId={selectedId}
               onSelect={setSelectedId}
               bulkIds={bulkIds}

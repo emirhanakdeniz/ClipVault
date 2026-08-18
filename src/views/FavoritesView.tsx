@@ -1,11 +1,13 @@
 import SnippetCard from "../components/SnippetCard";
 import EmptyState from "../components/EmptyState";
 import { getVisibleSnippets, hasQuery } from "../lib/search";
+import type { SnippetFilters } from "../lib/search";
 import type { Snippet } from "../types";
 
 interface FavoritesViewProps {
   snippets: Snippet[];
   query: string;
+  filters: SnippetFilters;
   selectedId: string | null;
   onSelect: (id: string) => void;
   bulkIds: string[];
@@ -18,6 +20,7 @@ interface FavoritesViewProps {
 export default function FavoritesView({
   snippets,
   query,
+  filters,
   selectedId,
   onSelect,
   bulkIds,
@@ -26,7 +29,10 @@ export default function FavoritesView({
   onTogglePin,
   onArchive,
 }: FavoritesViewProps) {
-  const visible = getVisibleSnippets(snippets, query, { favoritesOnly: true });
+  const visible = getVisibleSnippets(snippets, query, {
+    favoritesOnly: true,
+    filters,
+  });
 
   return (
     <section aria-label="Favorites">

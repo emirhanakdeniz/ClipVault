@@ -16,8 +16,15 @@ pub struct Snippet {
     pub favorite: bool,
     pub pinned: bool,
     pub archived: bool,
+    pub tags: Vec<String>,
     pub created_at: i64,
     pub updated_at: i64,
+}
+
+/// Decodes the tags column (a JSON array string) into a Vec<String>. A stored
+/// value that fails to parse degrades to no tags rather than failing the read.
+fn decode_tags(raw: String) -> Vec<String> {
+    serde_json::from_str(&raw).unwrap_or_default()
 }
 
 fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
@@ -29,6 +36,7 @@ fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
         favorite: row.get::<_, i64>(4)? != 0,
         pinned: row.get::<_, i64>(7)? != 0,
         archived: row.get::<_, i64>(8)? != 0,
+        tags: decode_tags(row.get(9)?),
         created_at: row.get(5)?,
         updated_at: row.get(6)?,
     })
@@ -36,7 +44,7 @@ fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
 
 fn fetch_snippet(conn: &Connection, id: &str) -> Result<Snippet, String> {
     conn.query_row(
-        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived
+        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags
          FROM snippets WHERE id = ?1",
         params![id],
         row_to_snippet,
@@ -49,7 +57,7 @@ pub fn list_snippets(db: State<'_, Db>) -> Result<Vec<Snippet>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived
+            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags
              FROM snippets ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -66,6 +74,7 @@ pub fn create_snippet(
     title: String,
     content: String,
     snippet_type: String,
+    tags: Option<Vec<String>>,
 ) -> Result<Snippet, String> {
     let now = now_ms();
     let snippet = Snippet {
@@ -76,13 +85,14 @@ pub fn create_snippet(
         favorite: false,
         pinned: false,
         archived: false,
+        tags: tags.unwrap_or_default(),
         created_at: now,
         updated_at: now,
     };
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         params![
             snippet.id,
             snippet.title,
@@ -91,6 +101,7 @@ pub fn create_snippet(
             snippet.favorite as i64,
             snippet.pinned as i64,
             snippet.archived as i64,
+            serde_json::to_string(&snippet.tags).map_err(|e| e.to_string())?,
             now,
             now
         ],
@@ -219,6 +230,7 @@ struct ImportEntry {
     favorite: Option<bool>,
     pinned: Option<bool>,
     archived: Option<bool>,
+    tags: Option<Vec<String>>,
     created_at: Option<i64>,
     updated_at: Option<i64>,
 }
@@ -240,7 +252,7 @@ pub fn export_snippets(db: State<'_, Db>, path: String) -> Result<usize, String>
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived
+            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags
              FROM snippets ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -265,7 +277,7 @@ pub fn export_snippets(db: State<'_, Db>, path: String) -> Result<usize, String>
                 favorite: s.favorite,
                 pinned: s.pinned,
                 archived: s.archived,
-                tags: Vec::new(),
+                tags: s.tags,
                 created_at: s.created_at,
                 updated_at: s.updated_at,
             })
@@ -306,6 +318,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
         favorite: bool,
         pinned: bool,
         archived: bool,
+        tags: Vec<String>,
         created_at: i64,
         updated_at: i64,
     }
@@ -354,6 +367,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
             favorite: entry.favorite.unwrap_or(false),
             pinned: entry.pinned.unwrap_or(false),
             archived: entry.archived.unwrap_or(false),
+            tags: entry.tags.clone().unwrap_or_default(),
             created_at: entry.created_at.unwrap_or(now),
             updated_at: entry.updated_at.unwrap_or(now),
         });
@@ -389,8 +403,8 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
             continue;
         }
         tx.execute(
-            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 entry.id,
                 entry.title,
@@ -399,6 +413,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
                 entry.favorite as i64,
                 entry.pinned as i64,
                 entry.archived as i64,
+                serde_json::to_string(&entry.tags).map_err(|e| e.to_string())?,
                 entry.created_at,
                 entry.updated_at
             ],

@@ -9,11 +9,13 @@ export function createSnippet(input: {
   title: string;
   content: string;
   type: SnippetType;
+  tags?: string[];
 }): Promise<Snippet> {
   return invoke<Snippet>("create_snippet", {
     title: input.title,
     content: input.content,
     snippetType: input.type,
+    tags: input.tags ?? [],
   });
 }
 

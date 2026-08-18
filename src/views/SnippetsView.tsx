@@ -1,11 +1,13 @@
 import SnippetCard from "../components/SnippetCard";
 import EmptyState from "../components/EmptyState";
 import { getVisibleSnippets, hasQuery } from "../lib/search";
+import type { SnippetFilters } from "../lib/search";
 import type { Snippet } from "../types";
 
 interface SnippetsViewProps {
   snippets: Snippet[];
   query: string;
+  filters: SnippetFilters;
   selectedId: string | null;
   onSelect: (id: string) => void;
   bulkIds: string[];
@@ -18,6 +20,7 @@ interface SnippetsViewProps {
 export default function SnippetsView({
   snippets,
   query,
+  filters,
   selectedId,
   onSelect,
   bulkIds,
@@ -26,7 +29,7 @@ export default function SnippetsView({
   onTogglePin,
   onArchive,
 }: SnippetsViewProps) {
-  const visible = getVisibleSnippets(snippets, query);
+  const visible = getVisibleSnippets(snippets, query, { filters });
 
   return (
     <section aria-label="Snippets">

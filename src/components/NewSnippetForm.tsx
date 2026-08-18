@@ -3,7 +3,12 @@ import type { FormEvent } from "react";
 import type { SnippetType } from "../types";
 
 interface NewSnippetFormProps {
-  onCreate: (input: { title: string; content: string; type: SnippetType }) => void;
+  onCreate: (input: {
+    title: string;
+    content: string;
+    type: SnippetType;
+    tags: string[];
+  }) => void;
   onCancel: () => void;
   notice?: string | null;
   onDismissNotice?: () => void;
@@ -24,15 +29,21 @@ export default function NewSnippetForm({
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [type, setType] = useState<SnippetType>("text");
+  const [tagsInput, setTagsInput] = useState("");
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const trimmedContent = content.trim();
     if (!trimmedContent) return;
+    const tags = tagsInput
+      .split(",")
+      .map((tag) => tag.trim().replace(/^#/, ""))
+      .filter(Boolean);
     onCreate({
       title: title.trim() || "Untitled snippet",
       content: trimmedContent,
       type,
+      tags: [...new Set(tags)],
     });
   }
 
@@ -63,6 +74,14 @@ export default function NewSnippetForm({
         aria-label="Snippet content"
         rows={3}
         autoFocus
+      />
+      <input
+        className="newsnippet__input"
+        type="text"
+        placeholder="Tags (comma-separated)"
+        value={tagsInput}
+        onChange={(event) => setTagsInput(event.target.value)}
+        aria-label="Snippet tags"
       />
       <div className="newsnippet__row">
         <select

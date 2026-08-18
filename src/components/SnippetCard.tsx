@@ -143,6 +143,11 @@ export default function SnippetCard({
         <span className={`card__type card__type--${snippet.type}`}>
           {snippet.type}
         </span>
+        {snippet.tags.map((tag) => (
+          <span key={tag} className="card__tag">
+            #{tag}
+          </span>
+        ))}
         <span className="card__time">{relativeTime(snippet.createdAt)}</span>
         <button
           type="button"
