@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 export type ViewId = "snippets" | "favorites" | "archive";
 
 interface SidebarProps {
@@ -8,6 +10,7 @@ interface SidebarProps {
   archiveCount: number;
   onExport: () => void;
   onImport: () => void;
+  footerExtra?: ReactNode;
 }
 
 export default function Sidebar({
@@ -18,6 +21,7 @@ export default function Sidebar({
   archiveCount,
   onExport,
   onImport,
+  footerExtra,
 }: SidebarProps) {
   const navItems: { id: ViewId; label: string; glyph: string; count: number }[] =
     [
@@ -56,6 +60,7 @@ export default function Sidebar({
         ))}
       </div>
       <div className="sidebar__footer">
+        {footerExtra}
         <span className="sidebar__footer-count">{snippetCount} saved</span>
         <div className="sidebar__footer-actions">
           <button

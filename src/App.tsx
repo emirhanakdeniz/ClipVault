@@ -28,6 +28,8 @@ import type { SnippetFilters } from "./lib/search";
 import { copyText } from "./lib/clipboard";
 import { findDuplicate } from "./lib/duplicates";
 import useShortcuts from "./hooks/useShortcuts";
+import useGlobalQuickCapture from "./hooks/useGlobalQuickCapture";
+import ShortcutSettings from "./components/ShortcutSettings";
 
 export default function App() {
   const [activeView, setActiveView] = useState<ViewId>("snippets");
@@ -303,6 +305,14 @@ export default function App() {
     },
   });
 
+  // System-wide Quick Capture shortcut: brings the window forward from any
+  // app and focuses the capture input (same target as the in-app Ctrl+I).
+  const globalQuickCapture = useGlobalQuickCapture(() =>
+    document
+      .querySelector<HTMLInputElement>(".quickcapture__content")
+      ?.focus(),
+  );
+
   // The snippet being edited. Keyed by id so the editor's draft resets only
   // when a different snippet is selected — never when this prop refreshes.
   const editing = snippets.find((s) => s.id === selectedId) ?? null;
@@ -321,6 +331,14 @@ export default function App() {
         archiveCount={archiveCount}
         onExport={handleExport}
         onImport={handleImport}
+        footerExtra={
+          <ShortcutSettings
+            setting={globalQuickCapture.setting}
+            status={globalQuickCapture.status}
+            message={globalQuickCapture.message}
+            onChange={globalQuickCapture.update}
+          />
+        }
       />
       <main className="content">
         <div className="toolbar">

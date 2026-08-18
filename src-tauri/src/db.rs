@@ -85,5 +85,14 @@ pub fn init(app: &tauri::AppHandle) -> Result<Db, String> {
         )
         .map_err(|e| e.to_string())?;
     }
+    // Generic key/value settings store (e.g. global shortcut preferences).
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(Db(Mutex::new(conn)))
 }

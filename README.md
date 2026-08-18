@@ -19,6 +19,7 @@ Designed for developers and power users who want a fast, keyboard-driven way to 
   - `Ctrl+N` (`Cmd+N`): Open New Snippet Form
   - `Ctrl+C` (`Cmd+C`): Copy Selected Snippet
   - `Ctrl+D` (`Cmd+D`): Toggle Favorite
+- **🌍 Global Quick Capture Shortcut** *(optional)*: A system-wide shortcut (default suggestion `Ctrl+Alt+V`, disabled by default) that opens/focuses ClipVault's Quick Capture from any application. Configure or re-record it in the sidebar; the choice is persisted locally, conflicts with other apps are reported instead of failing silently, and the feature stays off if registration fails.
 - **🔒 100% Local & Private**: All data is persisted locally in an embedded SQLite database (`rusqlite`) in your OS app data folder. Zero telemetry, zero cloud lock-in.
 - **💾 Import & Export**: Versioned JSON backup and restore with built-in schema validation and duplicate skipping.
 

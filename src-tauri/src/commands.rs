@@ -427,3 +427,33 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
 
     Ok(ImportResult { imported, skipped })
 }
+
+/// Reads a value from the generic settings table. Returns None when the key
+/// has never been written (e.g. first run after the feature was added).
+#[tauri::command]
+pub fn get_setting(db: State<'_, Db>, key: String) -> Result<Option<String>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    conn.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        params![key],
+        |row| row.get::<_, String>(0),
+    )
+    .map(Some)
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(None),
+        other => Err(other.to_string()),
+    })
+}
+
+/// Upserts a value in the generic settings table.
+#[tauri::command]
+pub fn set_setting(db: State<'_, Db>, key: String, value: String) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![key, value],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}

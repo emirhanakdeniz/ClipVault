@@ -9,6 +9,7 @@ use tauri::Manager;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let database = db::init(app.handle())?;
             app.manage(database);
@@ -24,6 +25,8 @@ fn main() {
             commands::delete_snippet,
             commands::export_snippets,
             commands::import_snippets,
+            commands::get_setting,
+            commands::set_setting,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
