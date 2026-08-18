@@ -39,6 +39,8 @@ fn main() {
             commands::lock_vault,
             commands::change_vault_passphrase,
             commands::disable_encryption,
+            commands::record_snippet_copy,
+            commands::get_usage_statistics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -20,6 +20,7 @@ export interface SnippetListViewProps {
   onRestore?: (id: string) => void;
   onDelete?: (id: string) => void;
   onUnlockVault?: () => void;
+  onCopy?: (id: string) => void;
 }
 
 const VIEW_METADATA: Record<
@@ -44,6 +45,12 @@ const VIEW_METADATA: Record<
     emptyTitle: "Nothing archived",
     emptyHint: "Archived snippets land here instead of being deleted.",
   },
+  statistics: {
+    label: "Statistics",
+    emptyGlyph: "📊",
+    emptyTitle: "Statistics",
+    emptyHint: "View your local usage statistics.",
+  },
 };
 
 export default function SnippetListView({
@@ -62,6 +69,7 @@ export default function SnippetListView({
   onRestore,
   onDelete,
   onUnlockVault,
+  onCopy,
 }: SnippetListViewProps) {
   const visible = getVisibleSnippets(snippets, query, {
     favoritesOnly: view === "favorites",
@@ -104,6 +112,7 @@ export default function SnippetListView({
               onRestore={view === "archive" ? onRestore : undefined}
               onDelete={view === "archive" ? onDelete : undefined}
               onUnlockVault={onUnlockVault}
+              onCopy={onCopy}
               index={index}
             />
           ))}

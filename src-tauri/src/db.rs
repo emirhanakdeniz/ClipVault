@@ -60,6 +60,7 @@ pub fn setup_schema(conn: &Connection) -> Result<(), String> {
     ensure_column(conn, "snippets", "tags", "TEXT NOT NULL DEFAULT '[]'")?;
     ensure_column(conn, "snippets", "source", "TEXT NOT NULL DEFAULT 'manual'")?;
     ensure_column(conn, "snippets", "sensitive", "INTEGER NOT NULL DEFAULT 0")?;
+    ensure_column(conn, "snippets", "copy_count", "INTEGER NOT NULL DEFAULT 0")?;
 
     // Generic key/value settings store (e.g. global shortcut preferences)
     conn.execute(
@@ -87,6 +88,12 @@ pub fn setup_schema(conn: &Connection) -> Result<(), String> {
 
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_snippets_sensitive ON snippets(sensitive)",
+        [],
+    )
+    .map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_snippets_copy_count ON snippets(copy_count DESC)",
         [],
     )
     .map_err(|e| e.to_string())?;
@@ -140,7 +147,17 @@ mod tests {
             .unwrap();
         assert_eq!(sensitive_exists, 1);
 
+        let copy_count_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('snippets') WHERE name='copy_count'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(copy_count_exists, 1);
+
         // Running ensure_column again should be an idempotent no-op
         assert!(ensure_column(&conn, "snippets", "sensitive", "INTEGER NOT NULL DEFAULT 0").is_ok());
+        assert!(ensure_column(&conn, "snippets", "copy_count", "INTEGER NOT NULL DEFAULT 0").is_ok());
     }
 }

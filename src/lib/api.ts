@@ -1,5 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { EncryptionStatus, Snippet, SnippetType } from "../types";
+import type {
+  EncryptionStatus,
+  Snippet,
+  SnippetType,
+  UsageStatistics,
+} from "../types";
 
 export function listSnippets(): Promise<Snippet[]> {
   return invoke<Snippet[]>("list_snippets");
@@ -94,4 +99,13 @@ export interface ImportResult {
 export function importSnippets(path: string): Promise<ImportResult> {
   return invoke<ImportResult>("import_snippets", { path });
 }
+
+export function recordSnippetCopy(id: string): Promise<number> {
+  return invoke<number>("record_snippet_copy", { id });
+}
+
+export function getUsageStatistics(): Promise<UsageStatistics> {
+  return invoke<UsageStatistics>("get_usage_statistics");
+}
+
 

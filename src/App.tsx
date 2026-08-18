@@ -5,6 +5,7 @@ import NewSnippetForm from "./components/NewSnippetForm";
 import QuickCapture from "./components/QuickCapture";
 import SnippetEditor from "./components/SnippetEditor";
 import SnippetListView from "./views/SnippetListView";
+import StatisticsView from "./views/StatisticsView";
 import BulkActionBar from "./components/BulkActionBar";
 import FilterBar from "./components/FilterBar";
 import ShortcutSettings from "./components/ShortcutSettings";
@@ -112,12 +113,14 @@ export default function App() {
             + New
           </button>
         </div>
-        <FilterBar
-          view={store.activeView}
-          filters={store.filters}
-          tags={store.allTags}
-          onChange={store.setFilters}
-        />
+        {store.activeView !== "statistics" && (
+          <FilterBar
+            view={store.activeView}
+            filters={store.filters}
+            tags={store.allTags}
+            onChange={store.setFilters}
+          />
+        )}
         {store.showForm && (
           <NewSnippetForm
             onCreate={store.handleCreate}
@@ -148,32 +151,44 @@ export default function App() {
           </div>
         )}
         <div className="view">
-          <BulkActionBar
-            count={store.bulkIds.length}
-            view={store.activeView}
-            onSetFavorite={store.bulkSetFavorite}
-            onArchive={store.bulkArchive}
-            onRestore={store.bulkRestore}
-            onDelete={store.bulkDelete}
-            onClear={() => store.setBulkIds([])}
-          />
-          <SnippetListView
-            view={store.activeView}
-            snippets={store.snippets}
-            query={store.query}
-            filters={store.filters}
-            selectedId={store.selectedId}
-            onSelect={store.setSelectedId}
-            bulkIds={store.bulkIds}
-            onToggleBulk={store.toggleBulk}
-            onToggleFavorite={store.toggleFavorite}
-            onTogglePin={store.togglePin}
-            onToggleSensitive={store.toggleSensitive}
-            onArchive={store.handleArchive}
-            onRestore={store.handleRestore}
-            onDelete={store.handleDelete}
-            onUnlockVault={() => setVaultModalMode("unlock")}
-          />
+          {store.activeView === "statistics" ? (
+            <StatisticsView
+              onSelectSnippet={(id) => {
+                store.setActiveView("snippets");
+                store.setSelectedId(id);
+              }}
+            />
+          ) : (
+            <>
+              <BulkActionBar
+                count={store.bulkIds.length}
+                view={store.activeView}
+                onSetFavorite={store.bulkSetFavorite}
+                onArchive={store.bulkArchive}
+                onRestore={store.bulkRestore}
+                onDelete={store.bulkDelete}
+                onClear={() => store.setBulkIds([])}
+              />
+              <SnippetListView
+                view={store.activeView}
+                snippets={store.snippets}
+                query={store.query}
+                filters={store.filters}
+                selectedId={store.selectedId}
+                onSelect={store.setSelectedId}
+                bulkIds={store.bulkIds}
+                onToggleBulk={store.toggleBulk}
+                onToggleFavorite={store.toggleFavorite}
+                onTogglePin={store.togglePin}
+                onToggleSensitive={store.toggleSensitive}
+                onArchive={store.handleArchive}
+                onRestore={store.handleRestore}
+                onDelete={store.handleDelete}
+                onUnlockVault={() => setVaultModalMode("unlock")}
+                onCopy={store.trackCopy}
+              />
+            </>
+          )}
         </div>
       </main>
 

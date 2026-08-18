@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
@@ -5,6 +6,8 @@ use uuid::Uuid;
 
 use crate::crypto::{EncryptionStatus, VaultManager};
 use crate::db::{now_ms, Db};
+
+pub const TOTAL_COPY_ACTIONS_KEY: &str = "total_copy_actions";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +33,9 @@ pub struct Snippet {
     /// True when the snippet is sensitive, encrypted, and the vault is locked.
     #[serde(default)]
     pub locked: bool,
+    /// Number of times this snippet has been copied.
+    #[serde(default)]
+    pub copy_count: u32,
 }
 
 fn default_source() -> String {
@@ -56,6 +62,7 @@ struct RawSnippet {
     pub updated_at: i64,
     pub source: String,
     pub sensitive: bool,
+    pub copy_count: u32,
 }
 
 fn row_to_raw_snippet(row: &rusqlite::Row) -> rusqlite::Result<RawSnippet> {
@@ -72,12 +79,13 @@ fn row_to_raw_snippet(row: &rusqlite::Row) -> rusqlite::Result<RawSnippet> {
         updated_at: row.get(6)?,
         source: row.get(10)?,
         sensitive: row.get::<_, i64>(11)? != 0,
+        copy_count: row.get::<_, u32>(12).unwrap_or(0),
     })
 }
 
 fn fetch_raw_snippet(conn: &Connection, id: &str) -> Result<RawSnippet, String> {
     conn.query_row(
-        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
+        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive, copy_count
          FROM snippets WHERE id = ?1",
         params![id],
         row_to_raw_snippet,
@@ -89,6 +97,7 @@ fn row_to_snippet(row: &rusqlite::Row, vault: &VaultManager) -> rusqlite::Result
     let sensitive = row.get::<_, i64>(11)? != 0;
     let raw_content: String = row.get(2)?;
     let (content, locked) = vault.decrypt_from_storage(&raw_content, sensitive);
+    let copy_count: u32 = row.get::<_, u32>(12).unwrap_or(0);
 
     Ok(Snippet {
         id: row.get(0)?,
@@ -104,12 +113,13 @@ fn row_to_snippet(row: &rusqlite::Row, vault: &VaultManager) -> rusqlite::Result
         source: row.get(10)?,
         sensitive,
         locked,
+        copy_count,
     })
 }
 
 fn fetch_snippet(conn: &Connection, vault: &VaultManager, id: &str) -> Result<Snippet, String> {
     conn.query_row(
-        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
+        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive, copy_count
          FROM snippets WHERE id = ?1",
         params![id],
         |row| row_to_snippet(row, vault),
@@ -120,7 +130,7 @@ fn fetch_snippet(conn: &Connection, vault: &VaultManager, id: &str) -> Result<Sn
 fn fetch_all_snippets(conn: &Connection, vault: &VaultManager) -> Result<Vec<Snippet>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
+            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive, copy_count
              FROM snippets ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -194,10 +204,11 @@ pub fn create_snippet(
         source: default_source(),
         sensitive: is_sensitive,
         locked: false,
+        copy_count: 0,
     };
     conn.execute(
-        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive, copy_count)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 0)",
         params![
             snippet.id,
             snippet.title,
@@ -339,6 +350,197 @@ pub fn delete_snippet(db: State<'_, Db>, id: String) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Usage Statistics commands
+// ---------------------------------------------------------------------------
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SnippetCopyStat {
+    pub id: String,
+    pub title: String,
+    pub snippet_type: String,
+    pub copy_count: u32,
+    pub favorite: bool,
+    pub sensitive: bool,
+    pub created_at: i64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageStatistics {
+    pub total_snippets: usize,
+    pub active_snippets: usize,
+    pub favorite_snippets: usize,
+    pub pinned_snippets: usize,
+    pub archived_snippets: usize,
+    pub sensitive_snippets: usize,
+    pub total_copies: u64,
+    pub top_copied: Vec<SnippetCopyStat>,
+    pub type_counts: HashMap<String, usize>,
+    pub source_counts: HashMap<String, usize>,
+    pub total_tags: usize,
+}
+
+#[tauri::command]
+pub fn record_snippet_copy(db: State<'_, Db>, id: String) -> Result<u32, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+    conn.execute(
+        "UPDATE snippets SET copy_count = copy_count + 1 WHERE id = ?1",
+        params![id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    let current_total: u64 = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = ?1",
+            params![TOTAL_COPY_ACTIONS_KEY],
+            |row| row.get::<_, String>(0),
+        )
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+
+    let next_total = current_total + 1;
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?1, ?2)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        params![TOTAL_COPY_ACTIONS_KEY, next_total.to_string()],
+    )
+    .map_err(|e| e.to_string())?;
+
+    let copy_count: u32 = conn
+        .query_row(
+            "SELECT copy_count FROM snippets WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .unwrap_or(1);
+
+    Ok(copy_count)
+}
+
+#[tauri::command]
+pub fn get_usage_statistics(db: State<'_, Db>) -> Result<UsageStatistics, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+    let total_snippets: usize = conn
+        .query_row("SELECT COUNT(*) FROM snippets", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let active_snippets: usize = conn
+        .query_row("SELECT COUNT(*) FROM snippets WHERE archived = 0", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let favorite_snippets: usize = conn
+        .query_row("SELECT COUNT(*) FROM snippets WHERE favorite = 1", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let pinned_snippets: usize = conn
+        .query_row("SELECT COUNT(*) FROM snippets WHERE pinned = 1", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let archived_snippets: usize = conn
+        .query_row("SELECT COUNT(*) FROM snippets WHERE archived = 1", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let sensitive_snippets: usize = conn
+        .query_row("SELECT COUNT(*) FROM snippets WHERE sensitive = 1", [], |r| r.get(0))
+        .map_err(|e| e.to_string())?;
+
+    let sum_copies: u64 = conn
+        .query_row("SELECT COALESCE(SUM(copy_count), 0) FROM snippets", [], |r| r.get(0))
+        .unwrap_or(0);
+
+    let setting_copies: u64 = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = ?1",
+            params![TOTAL_COPY_ACTIONS_KEY],
+            |r| r.get::<_, String>(0),
+        )
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(0);
+
+    let total_copies = std::cmp::max(sum_copies, setting_copies);
+
+    let mut top_stmt = conn
+        .prepare(
+            "SELECT id, title, type, copy_count, favorite, sensitive, created_at
+             FROM snippets WHERE copy_count > 0
+             ORDER BY copy_count DESC, updated_at DESC
+             LIMIT 10",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let top_copied: Vec<SnippetCopyStat> = top_stmt
+        .query_map([], |row| {
+            Ok(SnippetCopyStat {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                snippet_type: row.get(2)?,
+                copy_count: row.get(3)?,
+                favorite: row.get::<_, i64>(4)? != 0,
+                sensitive: row.get::<_, i64>(5)? != 0,
+                created_at: row.get(6)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let mut type_stmt = conn
+        .prepare("SELECT type, COUNT(*) FROM snippets GROUP BY type")
+        .map_err(|e| e.to_string())?;
+    let type_rows = type_stmt
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, usize>(1)?)))
+        .map_err(|e| e.to_string())?;
+    let mut type_counts = HashMap::new();
+    for item in type_rows.filter_map(|r| r.ok()) {
+        type_counts.insert(item.0, item.1);
+    }
+
+    let mut source_stmt = conn
+        .prepare("SELECT source, COUNT(*) FROM snippets GROUP BY source")
+        .map_err(|e| e.to_string())?;
+    let source_rows = source_stmt
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, usize>(1)?)))
+        .map_err(|e| e.to_string())?;
+    let mut source_counts = HashMap::new();
+    for item in source_rows.filter_map(|r| r.ok()) {
+        source_counts.insert(item.0, item.1);
+    }
+
+    let mut tags_stmt = conn
+        .prepare("SELECT tags FROM snippets")
+        .map_err(|e| e.to_string())?;
+    let tag_rows = tags_stmt
+        .query_map([], |r| r.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    let mut unique_tags = HashSet::new();
+    for raw in tag_rows.filter_map(|r| r.ok()) {
+        for tag in decode_tags(raw) {
+            unique_tags.insert(tag);
+        }
+    }
+    let total_tags = unique_tags.len();
+
+    Ok(UsageStatistics {
+        total_snippets,
+        active_snippets,
+        favorite_snippets,
+        pinned_snippets,
+        archived_snippets,
+        sensitive_snippets,
+        total_copies,
+        top_copied,
+        type_counts,
+        source_counts,
+        total_tags,
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Vault & Encryption commands
 // ---------------------------------------------------------------------------
 
@@ -417,6 +619,8 @@ struct ExportEntry {
     tags: Vec<String>,
     created_at: i64,
     updated_at: i64,
+    #[serde(default)]
+    copy_count: u32,
 }
 
 /// Versioned export envelope so future format changes stay detectable.
@@ -444,6 +648,7 @@ struct ImportEntry {
     tags: Option<Vec<String>>,
     created_at: Option<i64>,
     updated_at: Option<i64>,
+    copy_count: Option<u32>,
 }
 
 #[derive(Deserialize)]
@@ -492,6 +697,7 @@ pub fn export_snippets(
                 tags: s.tags,
                 created_at: s.created_at,
                 updated_at: s.updated_at,
+                copy_count: s.copy_count,
             })
             .collect(),
     };
@@ -536,6 +742,7 @@ pub fn import_snippets(
         tags: Vec<String>,
         created_at: i64,
         updated_at: i64,
+        copy_count: u32,
     }
 
     let mut valid = Vec::with_capacity(entries.len());
@@ -586,6 +793,7 @@ pub fn import_snippets(
             tags: entry.tags.clone().unwrap_or_default(),
             created_at: entry.created_at.unwrap_or(now),
             updated_at: entry.updated_at.unwrap_or(now),
+            copy_count: entry.copy_count.unwrap_or(0),
         });
     }
 
@@ -626,8 +834,8 @@ pub fn import_snippets(
         };
 
         tx.execute(
-            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, sensitive, tags, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, sensitive, tags, created_at, updated_at, copy_count)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
             params![
                 entry.id,
                 entry.title,
@@ -639,7 +847,8 @@ pub fn import_snippets(
                 entry.sensitive as i64,
                 serde_json::to_string(&entry.tags).map_err(|e| e.to_string())?,
                 entry.created_at,
-                entry.updated_at
+                entry.updated_at,
+                entry.copy_count as i64
             ],
         )
         .map_err(|e| e.to_string())?;
@@ -863,10 +1072,11 @@ pub fn capture_clipboard(
         source: "clipboard".to_string(),
         sensitive: false,
         locked: false,
+        copy_count: 0,
     };
     conn.execute(
-        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive, copy_count)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 0)",
         params![
             snippet.id,
             snippet.title,
@@ -931,13 +1141,14 @@ mod tests {
         let id = "test-snippet-1";
         let now = now_ms();
         conn.execute(
-            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
-             VALUES (?1, ?2, ?3, ?4, 0, 0, 0, '[]', ?5, ?5, 'manual', 0)",
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive, copy_count)
+             VALUES (?1, ?2, ?3, ?4, 0, 0, 0, '[]', ?5, ?5, 'manual', 0, 0)",
             params![id, "Test Title", "Test Content", "text", now],
         ).unwrap();
 
         let snippet = fetch_snippet(&conn, &vault, id).unwrap();
         assert_eq!(snippet.title, "Test Title");
+        assert_eq!(snippet.copy_count, 0);
         assert!(!snippet.favorite);
         assert!(!snippet.pinned);
 
@@ -958,35 +1169,31 @@ mod tests {
         setup_schema(&conn).unwrap();
         let vault = VaultManager::new();
 
-        // 1. Setup encryption with vault
         vault.setup(&conn, "super-passphrase").unwrap();
 
-        // 2. Insert normal snippet and sensitive snippet
         let normal_id = "normal-1";
         let sensitive_id = "sensitive-1";
         let now = now_ms();
 
         conn.execute(
-            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
-             VALUES (?1, ?2, ?3, 'text', 0, 0, 0, '[]', ?4, ?4, 'manual', 0)",
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive, copy_count)
+             VALUES (?1, ?2, ?3, 'text', 0, 0, 0, '[]', ?4, ?4, 'manual', 0, 0)",
             params![normal_id, "Normal Title", "Normal Plain Content", now],
         ).unwrap();
 
         let encrypted_content = vault.encrypt_for_storage(&conn, "Secret Database Password 123!").unwrap();
         conn.execute(
-            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
-             VALUES (?1, ?2, ?3, 'text', 0, 0, 0, '[]', ?4, ?4, 'manual', 1)",
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive, copy_count)
+             VALUES (?1, ?2, ?3, 'text', 0, 0, 0, '[]', ?4, ?4, 'manual', 1, 0)",
             params![sensitive_id, "Secret Title", encrypted_content, now],
         ).unwrap();
 
-        // 3. When vault is unlocked, both are accessible
         let list_unlocked = fetch_all_snippets(&conn, &vault).unwrap();
         assert_eq!(list_unlocked.len(), 2);
         let sensitive_unlocked = list_unlocked.iter().find(|s| s.id == sensitive_id).unwrap();
         assert_eq!(sensitive_unlocked.content, "Secret Database Password 123!");
         assert!(!sensitive_unlocked.locked);
 
-        // 4. When vault is locked, normal snippet is unaffected, sensitive snippet is locked
         vault.lock().unwrap();
         let list_locked = fetch_all_snippets(&conn, &vault).unwrap();
         let normal_item = list_locked.iter().find(|s| s.id == normal_id).unwrap();
@@ -997,10 +1204,56 @@ mod tests {
         assert!(sensitive_item.locked);
         assert_eq!(sensitive_item.content, "[Locked sensitive snippet]");
 
-        // 5. Unlock again
         vault.unlock(&conn, "super-passphrase").unwrap();
         let sensitive_restored = fetch_snippet(&conn, &vault, sensitive_id).unwrap();
         assert!(!sensitive_restored.locked);
         assert_eq!(sensitive_restored.content, "Secret Database Password 123!");
+    }
+
+    #[test]
+    fn test_record_snippet_copy_and_statistics() {
+        let conn = Connection::open_in_memory().unwrap();
+        setup_schema(&conn).unwrap();
+
+        let now = now_ms();
+        conn.execute(
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive, copy_count)
+             VALUES ('s1', 'Code Snippet', 'const x = 1;', 'code', 1, 1, 0, '[\"js\"]', ?1, ?1, 'manual', 0, 5)",
+            params![now],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive, copy_count)
+             VALUES ('s2', 'Link Snippet', 'https://example.com', 'link', 0, 0, 0, '[\"web\"]', ?1, ?1, 'clipboard', 0, 2)",
+            params![now],
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive, copy_count)
+             VALUES ('s3', 'Archived Snippet', 'Old notes', 'text', 0, 0, 1, '[]', ?1, ?1, 'manual', 1, 0)",
+            params![now],
+        ).unwrap();
+
+        // Increment copy on s2
+        conn.execute("UPDATE snippets SET copy_count = copy_count + 1 WHERE id = 's2'", []).unwrap();
+
+        let stats_db = Db(std::sync::Mutex::new(conn));
+        let stats = {
+            let conn = stats_db.0.lock().unwrap();
+            let total_snippets: usize = conn.query_row("SELECT COUNT(*) FROM snippets", [], |r| r.get(0)).unwrap();
+            let active_snippets: usize = conn.query_row("SELECT COUNT(*) FROM snippets WHERE archived = 0", [], |r| r.get(0)).unwrap();
+            let favorite_snippets: usize = conn.query_row("SELECT COUNT(*) FROM snippets WHERE favorite = 1", [], |r| r.get(0)).unwrap();
+            let archived_snippets: usize = conn.query_row("SELECT COUNT(*) FROM snippets WHERE archived = 1", [], |r| r.get(0)).unwrap();
+            let sensitive_snippets: usize = conn.query_row("SELECT COUNT(*) FROM snippets WHERE sensitive = 1", [], |r| r.get(0)).unwrap();
+            let total_copies: u64 = conn.query_row("SELECT SUM(copy_count) FROM snippets", [], |r| r.get(0)).unwrap();
+
+            assert_eq!(total_snippets, 3);
+            assert_eq!(active_snippets, 2);
+            assert_eq!(favorite_snippets, 1);
+            assert_eq!(archived_snippets, 1);
+            assert_eq!(sensitive_snippets, 1);
+            assert_eq!(total_copies, 8); // 5 + (2 + 1) + 0
+        };
+        let _ = stats;
     }
 }

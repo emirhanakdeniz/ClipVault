@@ -11,6 +11,7 @@ import {
   deleteSnippet,
   exportSnippets,
   importSnippets,
+  recordSnippetCopy,
 } from "../lib/api";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { getVisibleSnippets } from "../lib/search";
@@ -286,13 +287,27 @@ export function useSnippets() {
     setSelectedId(visible[index <= 0 ? 0 : index - 1].id);
   }
 
+  function trackCopy(id: string) {
+    recordSnippetCopy(id)
+      .then((newCount) => {
+        setSnippets((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, copyCount: newCount } : s)),
+        );
+      })
+      .catch(() => {
+        // Silently ignore copy track errors so user actions are uninterrupted
+      });
+  }
+
   async function copySelected() {
     const current = visible.find((s) => s.id === selectedId);
     if (!current) return;
+    if (current.locked) return;
     const ok = await copyText(current.content);
     if (!ok) {
       setError("Clipboard access denied or unavailable");
     } else {
+      trackCopy(current.id);
       setStatusNotice(`Copied “${current.title}” to clipboard.`);
       window.setTimeout(() => setStatusNotice(null), 1500);
     }
@@ -358,6 +373,7 @@ export function useSnippets() {
     selectNext,
     selectPrevious,
     copySelected,
+    trackCopy,
     handleClipboardCapture,
     handleClipboardRemove,
     reloadSnippets,

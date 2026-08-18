@@ -16,6 +16,7 @@ interface SnippetCardProps {
   onRestore?: (id: string) => void;
   onDelete?: (id: string) => void;
   onUnlockVault?: () => void;
+  onCopy?: (id: string) => void;
   index: number;
 }
 
@@ -32,6 +33,7 @@ export default function SnippetCard({
   onRestore,
   onDelete,
   onUnlockVault,
+  onCopy,
   index,
 }: SnippetCardProps) {
   const [copied, setCopied] = useState(false);
@@ -58,6 +60,7 @@ export default function SnippetCard({
         // Clipboard access denied (e.g. non-secure context); no-op.
         return;
       }
+      onCopy?.(snippet.id);
       setCopied(true);
       timer.current = window.setTimeout(() => setCopied(false), 1500);
     });

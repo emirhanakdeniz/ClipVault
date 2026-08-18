@@ -24,11 +24,12 @@ export default function Sidebar({
   onImport,
   footerExtra,
 }: SidebarProps) {
-  const navItems: { id: ViewId; label: string; glyph: string; count: number }[] =
+  const navItems: { id: ViewId; label: string; glyph: string; count?: number }[] =
     [
       { id: "snippets", label: "Snippets", glyph: "▤", count: snippetCount },
       { id: "favorites", label: "Favorites", glyph: "★", count: favoriteCount },
       { id: "archive", label: "Archive", glyph: "▣", count: archiveCount },
+      { id: "statistics", label: "Statistics", glyph: "📊" },
     ];
 
   return (
@@ -56,7 +57,9 @@ export default function Sidebar({
               {item.glyph}
             </span>
             <span className="sidebar__item-label">{item.label}</span>
-            <span className="sidebar__item-count">{item.count}</span>
+            {item.count !== undefined && (
+              <span className="sidebar__item-count">{item.count}</span>
+            )}
           </button>
         ))}
       </div>
