@@ -15,6 +15,7 @@ import {
 } from "./lib/api";
 import { getVisibleSnippets } from "./lib/search";
 import { copyText } from "./lib/clipboard";
+import { findDuplicate } from "./lib/duplicates";
 import useShortcuts from "./hooks/useShortcuts";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
 
   const favoriteCount = snippets.filter((s) => s.favorite).length;
 
@@ -50,10 +52,21 @@ export default function App() {
     content: string;
     type: SnippetType;
   }) {
+    // Prevent accidental duplicates (whitespace-normalized comparison).
+    // Existing snippets are never deleted or merged; the form stays open so
+    // the user can edit the content or cancel.
+    const duplicate = findDuplicate(snippets, input.content);
+    if (duplicate) {
+      setDuplicateNotice(
+        `Already saved as “${duplicate.title}” — not saved again.`,
+      );
+      return;
+    }
     try {
       const created = await createSnippet(input);
       setSnippets((prev) => [created, ...prev]);
       setShowForm(false);
+      setDuplicateNotice(null);
       setError(null);
     } catch (reason) {
       setError(String(reason));
@@ -148,7 +161,15 @@ export default function App() {
           </button>
         </div>
         {showForm && (
-          <NewSnippetForm onCreate={handleCreate} onCancel={() => setShowForm(false)} />
+          <NewSnippetForm
+            onCreate={handleCreate}
+            notice={duplicateNotice}
+            onDismissNotice={() => setDuplicateNotice(null)}
+            onCancel={() => {
+              setShowForm(false);
+              setDuplicateNotice(null);
+            }}
+          />
         )}
         {error && (
           <div className="error-banner" role="alert">

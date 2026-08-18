@@ -285,6 +285,17 @@ body {
   border-color: var(--brass);
 }
 
+.newsnippet__notice {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--brass);
+  border-radius: 6px;
+  background-color: var(--brass-dim);
+  color: var(--brass);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+}
+
 .newsnippet__row {
   display: flex;
   align-items: center;

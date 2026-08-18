@@ -5,6 +5,8 @@ import type { SnippetType } from "../types";
 interface NewSnippetFormProps {
   onCreate: (input: { title: string; content: string; type: SnippetType }) => void;
   onCancel: () => void;
+  notice?: string | null;
+  onDismissNotice?: () => void;
 }
 
 const TYPE_OPTIONS: { value: SnippetType; label: string }[] = [
@@ -13,7 +15,12 @@ const TYPE_OPTIONS: { value: SnippetType; label: string }[] = [
   { value: "link", label: "Link" },
 ];
 
-export default function NewSnippetForm({ onCreate, onCancel }: NewSnippetFormProps) {
+export default function NewSnippetForm({
+  onCreate,
+  onCancel,
+  notice = null,
+  onDismissNotice,
+}: NewSnippetFormProps) {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [type, setType] = useState<SnippetType>("text");
@@ -31,6 +38,11 @@ export default function NewSnippetForm({ onCreate, onCancel }: NewSnippetFormPro
 
   return (
     <form className="newsnippet" onSubmit={handleSubmit}>
+      {notice && (
+        <p className="newsnippet__notice" role="status">
+          {notice}
+        </p>
+      )}
       <input
         className="newsnippet__input"
         type="text"
@@ -43,7 +55,11 @@ export default function NewSnippetForm({ onCreate, onCancel }: NewSnippetFormPro
         className="newsnippet__textarea"
         placeholder="Snippet content"
         value={content}
-        onChange={(event) => setContent(event.target.value)}
+        onChange={(event) => {
+          setContent(event.target.value);
+          // Editing the content invalidates the duplicate warning.
+          if (notice) onDismissNotice?.();
+        }}
         aria-label="Snippet content"
         rows={3}
         autoFocus
