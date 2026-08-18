@@ -119,4 +119,8 @@ ClipVault/
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE).
+
+> Required Notice: Emirhan Akdeniz, github.com/emirhanakdeniz
+
+In short: you are free to use, modify, and distribute ClipVault for any **noncommercial** purpose (personal use, hobby projects, education, charity, research, etc.). Commercial use is **not** permitted under this license. See the full license text for details.
