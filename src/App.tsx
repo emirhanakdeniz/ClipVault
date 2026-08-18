@@ -4,6 +4,7 @@ import SearchBar from "./components/SearchBar";
 import NewSnippetForm from "./components/NewSnippetForm";
 import SnippetsView from "./views/SnippetsView";
 import FavoritesView from "./views/FavoritesView";
+import ArchiveView from "./views/ArchiveView";
 import type { ViewId } from "./components/Sidebar";
 import type { Snippet, SnippetType } from "./types";
 import {
@@ -11,6 +12,7 @@ import {
   createSnippet,
   setFavorite,
   setPinned,
+  setArchived,
   deleteSnippet,
 } from "./lib/api";
 import { getVisibleSnippets } from "./lib/search";
@@ -27,13 +29,16 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
 
-  const favoriteCount = snippets.filter((s) => s.favorite).length;
+  const active = snippets.filter((s) => !s.archived);
+  const favoriteCount = active.filter((s) => s.favorite).length;
+  const archiveCount = snippets.filter((s) => s.archived).length;
 
   // Same list the active view renders; keeps keyboard selection in sync.
   const visible = useMemo(
     () =>
       getVisibleSnippets(snippets, query, {
         favoritesOnly: activeView === "favorites",
+        archivedOnly: activeView === "archive",
       }),
     [snippets, query, activeView],
   );
@@ -97,6 +102,27 @@ export default function App() {
     }
   }
 
+  async function handleArchive(id: string) {
+    try {
+      const updated = await setArchived(id, true);
+      setSnippets((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      setSelectedId((prev) => (prev === id ? null : prev));
+      setError(null);
+    } catch (reason) {
+      setError(String(reason));
+    }
+  }
+
+  async function handleRestore(id: string) {
+    try {
+      const updated = await setArchived(id, false);
+      setSnippets((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      setError(null);
+    } catch (reason) {
+      setError(String(reason));
+    }
+  }
+
   async function handleDelete(id: string) {
     try {
       await deleteSnippet(id);
@@ -145,8 +171,9 @@ export default function App() {
       <Sidebar
         activeView={activeView}
         onSelect={setActiveView}
-        snippetCount={snippets.length}
+        snippetCount={active.length}
         favoriteCount={favoriteCount}
+        archiveCount={archiveCount}
       />
       <main className="content">
         <div className="toolbar">
@@ -185,7 +212,7 @@ export default function App() {
               onSelect={setSelectedId}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
-              onDelete={handleDelete}
+              onArchive={handleArchive}
             />
           )}
           {activeView === "favorites" && (
@@ -196,6 +223,18 @@ export default function App() {
               onSelect={setSelectedId}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
+              onArchive={handleArchive}
+            />
+          )}
+          {activeView === "archive" && (
+            <ArchiveView
+              snippets={snippets}
+              query={query}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onToggleFavorite={toggleFavorite}
+              onTogglePin={togglePin}
+              onRestore={handleRestore}
               onDelete={handleDelete}
             />
           )}

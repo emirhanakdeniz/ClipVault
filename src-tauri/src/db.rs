@@ -27,6 +27,7 @@ pub fn init(app: &tauri::AppHandle) -> Result<Db, String> {
             type TEXT NOT NULL DEFAULT 'text',
             favorite INTEGER NOT NULL DEFAULT 0,
             pinned INTEGER NOT NULL DEFAULT 0,
+            archived INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         )",
@@ -47,6 +48,22 @@ pub fn init(app: &tauri::AppHandle) -> Result<Db, String> {
     if !has_pinned {
         conn.execute(
             "ALTER TABLE snippets ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    // Same migration pattern for the archived column.
+    let has_archived = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('snippets') WHERE name = 'archived'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|e| e.to_string())?
+        > 0;
+    if !has_archived {
+        conn.execute(
+            "ALTER TABLE snippets ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
             [],
         )
         .map_err(|e| e.to_string())?;

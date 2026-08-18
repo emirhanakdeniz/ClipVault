@@ -7,6 +7,7 @@ export interface Snippet {
   type: SnippetType;
   favorite: boolean;
   pinned: boolean;
+  archived: boolean;
   createdAt: number;
   updatedAt: number;
 }

@@ -10,7 +10,7 @@ interface SnippetsViewProps {
   onSelect: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onDelete: (id: string) => void;
+  onArchive: (id: string) => void;
 }
 
 export default function SnippetsView({
@@ -20,7 +20,7 @@ export default function SnippetsView({
   onSelect,
   onToggleFavorite,
   onTogglePin,
-  onDelete,
+  onArchive,
 }: SnippetsViewProps) {
   const visible = getVisibleSnippets(snippets, query);
 
@@ -50,7 +50,7 @@ export default function SnippetsView({
               onSelect={onSelect}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
-              onDelete={onDelete}
+              onArchive={onArchive}
               index={index}
             />
           ))}

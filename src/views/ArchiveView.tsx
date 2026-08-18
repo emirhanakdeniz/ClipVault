@@ -3,29 +3,31 @@ import EmptyState from "../components/EmptyState";
 import { getVisibleSnippets, hasQuery } from "../lib/search";
 import type { Snippet } from "../types";
 
-interface FavoritesViewProps {
+interface ArchiveViewProps {
   snippets: Snippet[];
   query: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onArchive: (id: string) => void;
+  onRestore: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
-export default function FavoritesView({
+export default function ArchiveView({
   snippets,
   query,
   selectedId,
   onSelect,
   onToggleFavorite,
   onTogglePin,
-  onArchive,
-}: FavoritesViewProps) {
-  const visible = getVisibleSnippets(snippets, query, { favoritesOnly: true });
+  onRestore,
+  onDelete,
+}: ArchiveViewProps) {
+  const visible = getVisibleSnippets(snippets, query, { archivedOnly: true });
 
   return (
-    <section aria-label="Favorites">
+    <section aria-label="Archive">
       {visible.length === 0 ? (
         hasQuery(query) ? (
           <EmptyState
@@ -35,9 +37,9 @@ export default function FavoritesView({
           />
         ) : (
           <EmptyState
-            glyph="★"
-            title="No favorites yet"
-            hint="Star a snippet to keep it within reach."
+            glyph="▣"
+            title="Nothing archived"
+            hint="Archived snippets land here instead of being deleted."
           />
         )
       ) : (
@@ -50,7 +52,8 @@ export default function FavoritesView({
               onSelect={onSelect}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
-              onArchive={onArchive}
+              onRestore={onRestore}
+              onDelete={onDelete}
               index={index}
             />
           ))}
@@ -59,4 +62,3 @@ export default function FavoritesView({
     </section>
   );
 }
-

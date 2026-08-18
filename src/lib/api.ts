@@ -33,6 +33,13 @@ export function setPinned(id: string, pinned: boolean): Promise<Snippet> {
   return invoke<Snippet>("set_pinned", { id, pinned });
 }
 
+export function setArchived(
+  id: string,
+  archived: boolean,
+): Promise<Snippet> {
+  return invoke<Snippet>("set_archived", { id, archived });
+}
+
 export function deleteSnippet(id: string): Promise<void> {
   return invoke<void>("delete_snippet", { id });
 }

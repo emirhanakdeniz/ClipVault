@@ -21,18 +21,23 @@ export function hasQuery(query: string): boolean {
 
 /**
  * The single source of truth for which snippets a view shows:
- * view filtering (optionally favorites only), search matching, and the
- * pinned-first ordering. Used by both views for rendering and by App
- * for keyboard selection so they can never disagree.
+ * view filtering (favorites only, archived/active), search matching,
+ * and the pinned-first ordering. Used by both views for rendering and
+ * by App for keyboard selection so they can never disagree.
+ *
+ * Archived snippets are excluded unless `archivedOnly` is set (the
+ * Archive view shows only archived snippets).
  */
 export function getVisibleSnippets(
   snippets: Snippet[],
   query: string,
-  options?: { favoritesOnly?: boolean },
+  options?: { favoritesOnly?: boolean; archivedOnly?: boolean },
 ): Snippet[] {
-  const base = options?.favoritesOnly
-    ? snippets.filter((s) => s.favorite)
-    : snippets;
+  let base = snippets;
+  if (options?.favoritesOnly) base = base.filter((s) => s.favorite);
+  base = options?.archivedOnly
+    ? base.filter((s) => s.archived)
+    : base.filter((s) => !s.archived);
   const matching = base.filter((s) => matchesQuery(s, query));
   return [
     ...matching.filter((s) => s.pinned),

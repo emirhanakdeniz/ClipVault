@@ -465,6 +465,44 @@ body {
   color: var(--steel);
 }
 
+.card__archive {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  opacity: 0.55;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px;
+  transition: opacity 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.card__archive:hover {
+  opacity: 1;
+  color: var(--sage);
+  transform: scale(1.15);
+}
+
+.card__restore {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  opacity: 0.55;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px;
+  transition: opacity 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.card__restore:hover {
+  opacity: 1;
+  color: var(--sage);
+  transform: scale(1.15);
+}
+
 .card__actions {
   display: flex;
   align-items: center;

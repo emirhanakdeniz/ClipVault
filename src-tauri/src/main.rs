@@ -19,6 +19,7 @@ fn main() {
             commands::update_snippet,
             commands::set_favorite,
             commands::set_pinned,
+            commands::set_archived,
             commands::delete_snippet,
         ])
         .run(tauri::generate_context!())

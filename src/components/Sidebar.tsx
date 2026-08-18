@@ -1,10 +1,11 @@
-export type ViewId = "snippets" | "favorites";
+export type ViewId = "snippets" | "favorites" | "archive";
 
 interface SidebarProps {
   activeView: ViewId;
   onSelect: (view: ViewId) => void;
   snippetCount: number;
   favoriteCount: number;
+  archiveCount: number;
 }
 
 export default function Sidebar({
@@ -12,11 +13,13 @@ export default function Sidebar({
   onSelect,
   snippetCount,
   favoriteCount,
+  archiveCount,
 }: SidebarProps) {
   const navItems: { id: ViewId; label: string; glyph: string; count: number }[] =
     [
       { id: "snippets", label: "Snippets", glyph: "▤", count: snippetCount },
       { id: "favorites", label: "Favorites", glyph: "★", count: favoriteCount },
+      { id: "archive", label: "Archive", glyph: "▣", count: archiveCount },
     ];
 
   return (

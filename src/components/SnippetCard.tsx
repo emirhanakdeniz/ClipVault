@@ -9,7 +9,9 @@ interface SnippetCardProps {
   onSelect?: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
-  onDelete: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onRestore?: (id: string) => void;
+  onDelete?: (id: string) => void;
   index: number;
 }
 
@@ -19,6 +21,8 @@ export default function SnippetCard({
   onSelect,
   onToggleFavorite,
   onTogglePin,
+  onArchive,
+  onRestore,
   onDelete,
   index,
 }: SnippetCardProps) {
@@ -82,14 +86,38 @@ export default function SnippetCard({
           >
             ★
           </button>
-          <button
-            type="button"
-            className="card__delete"
-            onClick={() => onDelete(snippet.id)}
-            aria-label={`Delete ${snippet.title}`}
-          >
-            ×
-          </button>
+          {onArchive && (
+            <button
+              type="button"
+              className="card__archive"
+              onClick={() => onArchive(snippet.id)}
+              aria-label={`Archive ${snippet.title}`}
+              title="Archive"
+            >
+              ⌄
+            </button>
+          )}
+          {onRestore && (
+            <button
+              type="button"
+              className="card__restore"
+              onClick={() => onRestore(snippet.id)}
+              aria-label={`Restore ${snippet.title}`}
+              title="Restore"
+            >
+              ↥
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              className="card__delete"
+              onClick={() => onDelete(snippet.id)}
+              aria-label={`Delete ${snippet.title}`}
+            >
+              ×
+            </button>
+          )}
         </div>
       </header>
       <pre className="card__preview">{snippet.content}</pre>
