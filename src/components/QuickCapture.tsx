@@ -83,7 +83,7 @@ export default function QuickCapture({
         ref={contentRef}
         className="quickcapture__input quickcapture__content"
         type="text"
-        placeholder="Quick capture… (Ctrl+I, Enter to save)"
+        placeholder="Quick capture…"
         value={content}
         onChange={(event) => {
           setContent(event.target.value);

@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "ClipVault",
-        "width": 900,
-        "height": 600,
-        "minWidth": 640,
-        "minHeight": 400
+        "width": 1120,
+        "height": 740,
+        "minWidth": 840,
+        "minHeight": 520
       }
     ],
     "security": {
