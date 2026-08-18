@@ -21,6 +21,8 @@ interface UseClipboardHistoryOptions {
   onCapture: (snippet: Snippet) => void;
   /** Called when the limit pruned auto-captured entries. */
   onRemove: (ids: string[]) => void;
+  /** Called when saving or syncing settings fails. */
+  onError?: (message: string) => void;
 }
 
 /**
@@ -32,12 +34,13 @@ interface UseClipboardHistoryOptions {
 export default function useClipboardHistory({
   onCapture,
   onRemove,
+  onError,
 }: UseClipboardHistoryOptions) {
   const [setting, setSetting] =
     useState<ClipboardHistorySetting>(DEFAULT_CLIPBOARD_HISTORY);
 
-  const callbacksRef = useRef({ onCapture, onRemove });
-  callbacksRef.current = { onCapture, onRemove };
+  const callbacksRef = useRef({ onCapture, onRemove, onError });
+  callbacksRef.current = { onCapture, onRemove, onError };
   const initializedRef = useRef(false);
   const inFlightRef = useRef(false);
 
@@ -45,7 +48,9 @@ export default function useClipboardHistory({
   useEffect(() => {
     if (initializedRef.current) return;
     initializedRef.current = true;
-    loadClipboardHistory().then(setSetting);
+    loadClipboardHistory().then(setSetting).catch((err) => {
+      callbacksRef.current.onError?.(`Failed to load clipboard settings: ${String(err)}`);
+    });
   }, []);
 
   // Poll only while enabled; a single guard prevents overlapping invokes.
@@ -79,9 +84,10 @@ export default function useClipboardHistory({
       // capture. Disabled captures are still pruned by the backend.
       const removed = await invoke<string[]>("prune_clipboard_history");
       if (removed.length > 0) callbacksRef.current.onRemove(removed);
-    } catch {
-      // Persisting failed: keep the in-memory value so the UI stays usable;
-      // the next successful save reconciles the stored setting.
+    } catch (err) {
+      callbacksRef.current.onError?.(
+        `Failed to save clipboard history settings: ${String(err)}`,
+      );
     }
   }, []);
 

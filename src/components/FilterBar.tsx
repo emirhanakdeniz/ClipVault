@@ -1,4 +1,4 @@
-import type { ViewId } from "./Sidebar";
+import type { ViewId } from "../types";
 import type { DateRange, SnippetFilters } from "../lib/search";
 import { hasFilters } from "../lib/search";
 

@@ -1,4 +1,4 @@
-import type { ViewId } from "./Sidebar";
+import type { ViewId } from "../types";
 
 interface BulkActionBarProps {
   count: number;

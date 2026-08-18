@@ -9,8 +9,7 @@ import FavoritesView from "./views/FavoritesView";
 import ArchiveView from "./views/ArchiveView";
 import BulkActionBar from "./components/BulkActionBar";
 import FilterBar from "./components/FilterBar";
-import type { ViewId } from "./components/Sidebar";
-import type { Snippet, SnippetType } from "./types";
+import type { Snippet, SnippetType, ViewId } from "./types";
 import {
   listSnippets,
   createSnippet,
@@ -297,7 +296,13 @@ export default function App() {
   async function copySelected() {
     const current = visible.find((s) => s.id === selectedId);
     if (!current) return;
-    await copyText(current.content);
+    const ok = await copyText(current.content);
+    if (!ok) {
+      setError("Clipboard access denied or unavailable");
+    } else {
+      setStatusNotice(`Copied “${current.title}” to clipboard.`);
+      window.setTimeout(() => setStatusNotice(null), 1500);
+    }
   }
 
   useShortcuts({
@@ -344,6 +349,7 @@ export default function App() {
       );
       setBulkIds((prev) => prev.filter((id) => !removed.has(id)));
     },
+    onError: (message) => setError(message),
   });
 
   // The snippet being edited. Keyed by id so the editor's draft resets only

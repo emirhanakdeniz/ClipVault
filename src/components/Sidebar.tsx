@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
+import type { ViewId } from "../types";
 
-export type ViewId = "snippets" | "favorites" | "archive";
+export type { ViewId };
 
 interface SidebarProps {
   activeView: ViewId;

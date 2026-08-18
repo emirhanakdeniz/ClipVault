@@ -42,12 +42,15 @@ export default function SnippetEditor({
   // so unchanged drafts never hit the database.
   const savedRef = useRef({ title: snippet.title, content: snippet.content });
   const savedHintTimer = useRef<number | undefined>(undefined);
+  const debounceTimer = useRef<number | undefined>(undefined);
+  const inFlightRef = useRef(false);
+  const onSaveRef = useRef(onSave);
+  onSaveRef.current = onSave;
 
   const isDirty =
     title !== savedRef.current.title || content !== savedRef.current.content;
 
-  // Re-derive the indicator whenever the draft changes; the debounce below
-  // performs the actual save.
+  // Re-derive the indicator whenever the draft changes.
   useEffect(() => {
     if (saveState === "saving") return;
     if (isDirty) {
@@ -57,11 +60,13 @@ export default function SnippetEditor({
     } else if (saveState !== "saved") {
       setSaveState("idle");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content]);
+  }, [title, content, isDirty, saveState]);
 
   useEffect(() => {
-    return () => window.clearTimeout(savedHintTimer.current);
+    return () => {
+      window.clearTimeout(savedHintTimer.current);
+      window.clearTimeout(debounceTimer.current);
+    };
   }, []);
 
   function markSaved() {
@@ -74,6 +79,7 @@ export default function SnippetEditor({
   }
 
   async function save(nextTitle: string, nextContent: string) {
+    if (inFlightRef.current) return;
     // Skip empty content (same rule as the new-snippet form) and skip
     // unchanged drafts so no unnecessary database write is issued.
     if (!nextContent.trim()) return;
@@ -83,44 +89,50 @@ export default function SnippetEditor({
     ) {
       return;
     }
+    inFlightRef.current = true;
     setSaveState("saving");
     try {
-      await onSave(snippet.id, nextTitle, nextContent);
+      await onSaveRef.current(snippet.id, nextTitle, nextContent);
       savedRef.current = { title: nextTitle, content: nextContent };
       markSaved();
     } catch {
       // Keep the draft and mark it dirty so autosave retries on the
       // next edit; the parent surfaces the error banner.
       setSaveState("dirty");
+    } finally {
+      inFlightRef.current = false;
     }
   }
 
   // Debounced autosave for dirty drafts.
   useEffect(() => {
     if (!isDirty) return;
-    const timer = window.setTimeout(() => {
+    window.clearTimeout(debounceTimer.current);
+    debounceTimer.current = window.setTimeout(() => {
       void save(title, content);
     }, AUTOSAVE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, content]);
+    return () => window.clearTimeout(debounceTimer.current);
+  }, [title, content, isDirty]);
 
   // Flush pending edits when the editor unmounts (e.g. the user selects a
   // different snippet) so no unsaved change is lost.
   const draftRef = useRef({ title, content });
   draftRef.current = { title, content };
   useEffect(() => {
-    const draft = draftRef.current;
+    const currentId = snippet.id;
     return () => {
+      window.clearTimeout(debounceTimer.current);
+      const draft = draftRef.current;
       if (
         draft.content.trim() &&
         (draft.title !== savedRef.current.title ||
           draft.content !== savedRef.current.content)
       ) {
-        void onSave(snippet.id, draft.title, draft.content);
+        onSaveRef.current(currentId, draft.title, draft.content).catch(() => {
+          // Unmount flush errors are safely caught; state handled by parent.
+        });
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snippet.id]);
 
   function handleTitleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
