@@ -43,3 +43,16 @@ export function setArchived(
 export function deleteSnippet(id: string): Promise<void> {
   return invoke<void>("delete_snippet", { id });
 }
+
+export function exportSnippets(path: string): Promise<number> {
+  return invoke<number>("export_snippets", { path });
+}
+
+export interface ImportResult {
+  imported: number;
+  skipped: number;
+}
+
+export function importSnippets(path: string): Promise<ImportResult> {
+  return invoke<ImportResult>("import_snippets", { path });
+}

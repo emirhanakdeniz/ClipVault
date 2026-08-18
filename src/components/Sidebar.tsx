@@ -6,6 +6,8 @@ interface SidebarProps {
   snippetCount: number;
   favoriteCount: number;
   archiveCount: number;
+  onExport: () => void;
+  onImport: () => void;
 }
 
 export default function Sidebar({
@@ -14,6 +16,8 @@ export default function Sidebar({
   snippetCount,
   favoriteCount,
   archiveCount,
+  onExport,
+  onImport,
 }: SidebarProps) {
   const navItems: { id: ViewId; label: string; glyph: string; count: number }[] =
     [
@@ -53,6 +57,24 @@ export default function Sidebar({
       </div>
       <div className="sidebar__footer">
         <span className="sidebar__footer-count">{snippetCount} saved</span>
+        <div className="sidebar__footer-actions">
+          <button
+            type="button"
+            className="sidebar__footer-btn"
+            onClick={onExport}
+            title="Export all snippets to a JSON file"
+          >
+            ↥ Export
+          </button>
+          <button
+            type="button"
+            className="sidebar__footer-btn"
+            onClick={onImport}
+            title="Import snippets from a ClipVault JSON file"
+          >
+            ↧ Import
+          </button>
+        </div>
       </div>
     </nav>
   );

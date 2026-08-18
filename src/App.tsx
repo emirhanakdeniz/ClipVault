@@ -15,7 +15,10 @@ import {
   setPinned,
   setArchived,
   deleteSnippet,
+  exportSnippets,
+  importSnippets,
 } from "./lib/api";
+import { save, open } from "@tauri-apps/plugin-dialog";
 import { getVisibleSnippets } from "./lib/search";
 import { copyText } from "./lib/clipboard";
 import { findDuplicate } from "./lib/duplicates";
@@ -30,6 +33,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bulkIds, setBulkIds] = useState<string[]>([]);
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
 
   const active = snippets.filter((s) => !s.archived);
   const favoriteCount = active.filter((s) => s.favorite).length;
@@ -186,6 +190,45 @@ export default function App() {
     return runBulk((id) => deleteSnippet(id).then(() => null));
   }
 
+  async function handleExport() {
+    try {
+      const path = await save({
+        title: "Export snippets",
+        defaultPath: "clipvault-snippets.json",
+        filters: [{ name: "ClipVault JSON", extensions: ["json"] }],
+      });
+      if (!path) return; // user cancelled
+      const count = await exportSnippets(path);
+      setStatusNotice(`Exported ${count} snippet${count === 1 ? "" : "s"}.`);
+      setError(null);
+    } catch (reason) {
+      setError(String(reason));
+    }
+  }
+
+  async function handleImport() {
+    try {
+      const path = await open({
+        title: "Import snippets",
+        multiple: false,
+        directory: false,
+        filters: [{ name: "ClipVault JSON", extensions: ["json"] }],
+      });
+      if (!path) return; // user cancelled
+      const result = await importSnippets(path);
+      // Re-fetch so the list reflects exactly what landed in SQLite.
+      const loaded = await listSnippets();
+      setSnippets(loaded);
+      const skipped =
+        result.skipped > 0 ? ` (${result.skipped} duplicate${result.skipped === 1 ? "" : "s"} skipped)` : "";
+      setStatusNotice(`Imported ${result.imported} snippet${result.imported === 1 ? "" : "s"}${skipped}.`);
+      setError(null);
+    } catch (reason) {
+      // Validation or parse failure: nothing was written to the database.
+      setError(String(reason));
+    }
+  }
+
   function selectNext() {
     if (visible.length === 0) return;
     const index = visible.findIndex((s) => s.id === selectedId);
@@ -232,6 +275,8 @@ export default function App() {
         snippetCount={active.length}
         favoriteCount={favoriteCount}
         archiveCount={archiveCount}
+        onExport={handleExport}
+        onImport={handleImport}
       />
       <main className="content">
         <div className="toolbar">
@@ -255,6 +300,11 @@ export default function App() {
               setDuplicateNotice(null);
             }}
           />
+        )}
+        {statusNotice && (
+          <div className="status-banner" role="status">
+            {statusNotice}
+          </div>
         )}
         {error && (
           <div className="error-banner" role="alert">
