@@ -57,12 +57,23 @@ Ensure you have the following installed on your machine:
    npm install
    ```
 
-3. **Run the application in development mode:**
+3. **Run automated tests & verification:**
+   ```bash
+   # Run Rust backend unit test suite
+   npm run tauri -- test
+   # or directly in src-tauri:
+   # cargo test
+
+   # Run TypeScript type check and build
+   npm run build
+   ```
+
+4. **Run the application in development mode:**
    ```bash
    npm run tauri dev
    ```
 
-4. **Build for production:**
+5. **Build for production:**
    ```bash
    npm run tauri build
    ```
@@ -74,18 +85,18 @@ Ensure you have the following installed on your machine:
 ```text
 ClipVault/
 ├── src/                      # React frontend source
-│   ├── components/           # UI components (Sidebar, SearchBar, SnippetCard, etc.)
-│   ├── hooks/                # Custom React hooks (useShortcuts, etc.)
-│   ├── lib/                  # Utilities (API IPC bridge, search, shortcuts, duplicates)
-│   ├── views/                # Main views (SnippetsView, FavoritesView, ArchiveView)
-│   ├── App.tsx               # Main application component & state management
+│   ├── components/           # UI components (Sidebar, SearchBar, SnippetCard, SnippetEditor, etc.)
+│   ├── hooks/                # Custom React hooks (useSnippets, useShortcuts, useClipboardHistory, etc.)
+│   ├── lib/                  # Utilities (IPC bridge, search, shortcuts, settings, duplicates)
+│   ├── views/                # Views (SnippetListView, SnippetsView, FavoritesView, ArchiveView)
+│   ├── App.tsx               # Root application layout & coordinator
 │   ├── styles.css            # Custom styling & themes
-│   └── types.ts              # Core TypeScript interfaces & types
+│   └── types.ts              # Core TypeScript interfaces, types, and ViewId definitions
 ├── src-tauri/                # Rust backend source
 │   ├── src/
-│   │   ├── commands.rs       # Tauri IPC commands (CRUD, import/export)
-│   │   ├── db.rs             # SQLite connection & schema migrations
-│   │   └── main.rs           # Tauri application entry point
+│   │   ├── commands.rs       # Tauri IPC commands (CRUD, import/export, clipboard capture)
+│   │   ├── db.rs             # SQLite schema, migrations & performance indexes
+│   │   └── main.rs           # Tauri application entry point & plugin registrations
 │   ├── Cargo.toml            # Rust dependencies & metadata
 │   └── tauri.conf.json       # Tauri app configuration
 ├── package.json
