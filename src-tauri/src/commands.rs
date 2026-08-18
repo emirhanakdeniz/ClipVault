@@ -65,9 +65,7 @@ fn fetch_snippet(conn: &Connection, id: &str) -> Result<Snippet, String> {
     .map_err(|_| format!("snippet {id} not found"))
 }
 
-#[tauri::command]
-pub fn list_snippets(db: State<'_, Db>) -> Result<Vec<Snippet>, String> {
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
+fn fetch_all_snippets(conn: &Connection) -> Result<Vec<Snippet>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
@@ -79,6 +77,31 @@ pub fn list_snippets(db: State<'_, Db>) -> Result<Vec<Snippet>, String> {
         .map_err(|e| e.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())
+}
+
+fn update_snippet_flag(
+    conn: &Connection,
+    id: &str,
+    column: &str,
+    value: bool,
+) -> Result<Snippet, String> {
+    let sql = format!(
+        "UPDATE snippets SET {} = ?1, updated_at = ?2 WHERE id = ?3",
+        column
+    );
+    let changed = conn
+        .execute(&sql, params![value as i64, now_ms(), id])
+        .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err(format!("snippet {id} not found"));
+    }
+    fetch_snippet(conn, id)
+}
+
+#[tauri::command]
+pub fn list_snippets(db: State<'_, Db>) -> Result<Vec<Snippet>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    fetch_all_snippets(&conn)
 }
 
 #[tauri::command]
@@ -106,8 +129,8 @@ pub fn create_snippet(
     };
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
-        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             snippet.id,
             snippet.title,
@@ -118,7 +141,9 @@ pub fn create_snippet(
             snippet.archived as i64,
             serde_json::to_string(&snippet.tags).map_err(|e| e.to_string())?,
             now,
-            now
+            now,
+            snippet.source,
+            snippet.sensitive as i64
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -148,61 +173,25 @@ pub fn update_snippet(
 #[tauri::command]
 pub fn set_favorite(db: State<'_, Db>, id: String, favorite: bool) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let changed = conn
-        .execute(
-            "UPDATE snippets SET favorite = ?1, updated_at = ?2 WHERE id = ?3",
-            params![favorite as i64, now_ms(), id],
-        )
-        .map_err(|e| e.to_string())?;
-    if changed == 0 {
-        return Err(format!("snippet {id} not found"));
-    }
-    fetch_snippet(&conn, &id)
+    update_snippet_flag(&conn, &id, "favorite", favorite)
 }
 
 #[tauri::command]
 pub fn set_pinned(db: State<'_, Db>, id: String, pinned: bool) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let changed = conn
-        .execute(
-            "UPDATE snippets SET pinned = ?1, updated_at = ?2 WHERE id = ?3",
-            params![pinned as i64, now_ms(), id],
-        )
-        .map_err(|e| e.to_string())?;
-    if changed == 0 {
-        return Err(format!("snippet {id} not found"));
-    }
-    fetch_snippet(&conn, &id)
+    update_snippet_flag(&conn, &id, "pinned", pinned)
 }
 
 #[tauri::command]
 pub fn set_archived(db: State<'_, Db>, id: String, archived: bool) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let changed = conn
-        .execute(
-            "UPDATE snippets SET archived = ?1, updated_at = ?2 WHERE id = ?3",
-            params![archived as i64, now_ms(), id],
-        )
-        .map_err(|e| e.to_string())?;
-    if changed == 0 {
-        return Err(format!("snippet {id} not found"));
-    }
-    fetch_snippet(&conn, &id)
+    update_snippet_flag(&conn, &id, "archived", archived)
 }
 
 #[tauri::command]
 pub fn set_sensitive(db: State<'_, Db>, id: String, sensitive: bool) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let changed = conn
-        .execute(
-            "UPDATE snippets SET sensitive = ?1, updated_at = ?2 WHERE id = ?3",
-            params![sensitive as i64, now_ms(), id],
-        )
-        .map_err(|e| e.to_string())?;
-    if changed == 0 {
-        return Err(format!("snippet {id} not found"));
-    }
-    fetch_snippet(&conn, &id)
+    update_snippet_flag(&conn, &id, "sensitive", sensitive)
 }
 
 #[tauri::command]
@@ -282,18 +271,7 @@ pub struct ImportResult {
 #[tauri::command]
 pub fn export_snippets(db: State<'_, Db>, path: String) -> Result<usize, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
-             FROM snippets ORDER BY created_at DESC",
-        )
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], row_to_snippet)
-        .map_err(|e| e.to_string())?;
-    let snippets: Vec<Snippet> = rows
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?;
+    let snippets = fetch_all_snippets(&conn)?;
 
     let file = ExportFile {
         format: "clipvault-export",
@@ -498,6 +476,8 @@ pub fn set_setting(db: State<'_, Db>, key: String, value: String) -> Result<(), 
 
 const CLIPBOARD_SETTING_KEY: &str = "clipboardHistory";
 
+static LAST_SEEN_CLIPBOARD: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 #[serde(rename_all = "camelCase")]
 struct ClipboardHistorySetting {
@@ -617,28 +597,52 @@ pub fn capture_clipboard(
         });
     }
 
+    // Fast-path in-memory check: if clipboard content hasn't changed since last poll, skip DB queries.
+    if let Ok(last) = LAST_SEEN_CLIPBOARD.lock() {
+        if let Some(ref prev) = *last {
+            if prev == trimmed {
+                return Ok(CaptureOutcome {
+                    created: None,
+                    removed_ids: Vec::new(),
+                    enabled: true,
+                });
+            }
+        }
+    }
+
+    if let Ok(mut last) = LAST_SEEN_CLIPBOARD.lock() {
+        *last = Some(trimmed.to_string());
+    }
+
     // Same whitespace-normalized duplicate rule as manual creation/import.
     // Sensitive snippets are deliberately excluded from this comparison so
     // clipboard monitoring never matches against (or reveals the existence of)
     // protected content.
     let normalized = normalize_content(trimmed);
-    let duplicate = {
+    let latest_duplicate = conn
+        .query_row(
+            "SELECT content FROM snippets WHERE sensitive = 0 ORDER BY created_at DESC LIMIT 1",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .map(|content| normalize_content(&content) == normalized)
+        .unwrap_or(false);
+
+    let duplicate = if latest_duplicate {
+        true
+    } else {
         let mut stmt = conn
-            .prepare("SELECT id, content FROM snippets WHERE sensitive = 0")
+            .prepare("SELECT content FROM snippets WHERE sensitive = 0")
             .map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })
+            .query_map([], |row| row.get::<_, String>(0))
             .map_err(|e| e.to_string())?;
-        let duplicate = rows
+        let found = rows
             .into_iter()
-            .any(|row| {
-                row.map(|(_, content)| normalize_content(&content) == normalized)
-                    .unwrap_or(false)
-            });
-        duplicate
+            .any(|row| row.map(|content| normalize_content(&content) == normalized).unwrap_or(false));
+        found
     };
+
     if duplicate {
         let removed_ids = prune_clipboard_entries(&conn, setting.limit)?;
         return Ok(CaptureOutcome {
@@ -664,8 +668,8 @@ pub fn capture_clipboard(
         sensitive: false,
     };
     conn.execute(
-        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             snippet.id,
             snippet.title,
@@ -677,7 +681,8 @@ pub fn capture_clipboard(
             serde_json::to_string(&snippet.tags).map_err(|e| e.to_string())?,
             now,
             now,
-            snippet.source
+            snippet.source,
+            snippet.sensitive as i64
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -696,4 +701,62 @@ pub fn prune_clipboard_history(db: State<'_, Db>) -> Result<Vec<String>, String>
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let setting = read_clipboard_setting(&conn);
     prune_clipboard_entries(&conn, setting.limit)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::setup_schema;
+
+    #[test]
+    fn test_normalize_content() {
+        assert_eq!(normalize_content("  hello   world  "), "hello world");
+        assert_eq!(normalize_content("line1\n\n\tline2  line3"), "line1 line2 line3");
+        assert_eq!(normalize_content(""), "");
+    }
+
+    #[test]
+    fn test_title_from_content() {
+        assert_eq!(title_from_content("First line\nSecond line"), "First line");
+        assert_eq!(title_from_content("   \n\nTrimmed start"), "Trimmed start");
+        assert_eq!(title_from_content(""), "Clipboard entry");
+
+        let long_line = "a".repeat(100);
+        let title = title_from_content(&long_line);
+        assert_eq!(title.chars().count(), 61); // 60 chars + ellipsis
+        assert!(title.ends_with('…'));
+    }
+
+    #[test]
+    fn test_crud_and_flag_updates() {
+        let conn = Connection::open_in_memory().unwrap();
+        setup_schema(&conn).unwrap();
+
+        let id = "test-snippet-1";
+        let now = now_ms();
+        conn.execute(
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
+             VALUES (?1, ?2, ?3, ?4, 0, 0, 0, '[]', ?5, ?5, 'manual', 0)",
+            params![id, "Test Title", "Test Content", "text", now],
+        ).unwrap();
+
+        let snippet = fetch_snippet(&conn, id).unwrap();
+        assert_eq!(snippet.title, "Test Title");
+        assert!(!snippet.favorite);
+        assert!(!snippet.pinned);
+
+        // Update flags
+        let updated = update_snippet_flag(&conn, id, "favorite", true).unwrap();
+        assert!(updated.favorite);
+
+        let updated = update_snippet_flag(&conn, id, "pinned", true).unwrap();
+        assert!(updated.pinned);
+
+        let updated = update_snippet_flag(&conn, id, "sensitive", true).unwrap();
+        assert!(updated.sensitive);
+
+        let all = fetch_all_snippets(&conn).unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, id);
+    }
 }
