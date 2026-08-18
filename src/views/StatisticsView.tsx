@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { UsageStatistics } from "../types";
 import { getUsageStatistics } from "../lib/api";
 import { relativeTime } from "../lib/time";
+import { IconHeart, IconBookmark, IconLock } from "../components/Icons";
 
 interface StatisticsViewProps {
   onSelectSnippet?: (id: string) => void;
@@ -101,20 +102,28 @@ export default function StatisticsView({
         <div className="stats-card">
           <span className="stats-card__label">Favorites &amp; Pinned</span>
           <span className="stats-card__value">
-            ★ {stats.favoriteSnippets}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <IconHeart size={18} filled={true} style={{ color: "var(--brass)" }} />
+              {stats.favoriteSnippets}
+            </span>
           </span>
           <span className="stats-card__meta">
-            📌 {stats.pinnedSnippets} pinned to top
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <IconBookmark size={13} filled={true} /> {stats.pinnedSnippets} pinned to top
+            </span>
           </span>
         </div>
 
         <div className="stats-card">
           <span className="stats-card__label">Sensitive &amp; Tags</span>
           <span className="stats-card__value">
-            🔒 {stats.sensitiveSnippets}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <IconLock size={18} />
+              {stats.sensitiveSnippets}
+            </span>
           </span>
           <span className="stats-card__meta">
-            🏷️ {stats.totalTags} unique tags
+            {stats.totalTags} unique tags organized
           </span>
         </div>
       </section>
@@ -231,15 +240,18 @@ export default function StatisticsView({
                 <div className="stats-leaderboard__info">
                   <div className="stats-leaderboard__title-row">
                     {item.sensitive && (
-                      <span
+                      <IconLock
+                        size={14}
                         className="card__sensitive-badge"
                         title="Sensitive snippet"
-                      >
-                        🔒
-                      </span>
+                      />
                     )}
                     {item.favorite && (
-                      <span className="stats-leaderboard__star">★</span>
+                      <IconHeart
+                        size={14}
+                        filled={true}
+                        style={{ color: "var(--brass)" }}
+                      />
                     )}
                     <span className="stats-leaderboard__title">
                       {item.title}

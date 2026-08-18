@@ -4,7 +4,9 @@ export type SnippetType = "code" | "text" | "link";
 export type SnippetSource = "manual" | "clipboard";
 
 /** Primary view identifier for navigation and routing. */
-export type ViewId = "snippets" | "favorites" | "archive" | "statistics";
+export type ViewId = "snippets" | "favorites" | "archive" | "statistics" | "settings";
+
+export type ThemeMode = "dark" | "light" | "system";
 
 export interface Snippet {
   id: string;

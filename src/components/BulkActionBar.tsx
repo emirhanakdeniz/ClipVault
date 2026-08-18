@@ -1,4 +1,5 @@
 import type { ViewId } from "../types";
+import { IconHeart, IconArchive, IconRestore, IconTrash } from "./Icons";
 
 interface BulkActionBarProps {
   count: number;
@@ -27,18 +28,18 @@ export default function BulkActionBar({
         {count} selected
       </span>
       <button type="button" className="bulkbar__btn" onClick={() => onSetFavorite(true)}>
-        ★ Favorite
+        <IconHeart size={14} filled={true} /> Favorite
       </button>
       <button type="button" className="bulkbar__btn" onClick={() => onSetFavorite(false)}>
-        ☆ Unfavorite
+        <IconHeart size={14} filled={false} /> Unfavorite
       </button>
       {view !== "archive" ? (
         <button type="button" className="bulkbar__btn" onClick={onArchive}>
-          ⌄ Archive
+          <IconArchive size={14} /> Archive
         </button>
       ) : (
         <button type="button" className="bulkbar__btn" onClick={onRestore}>
-          ↥ Restore
+          <IconRestore size={14} /> Restore
         </button>
       )}
       {view === "archive" && (
@@ -47,7 +48,7 @@ export default function BulkActionBar({
           className="bulkbar__btn bulkbar__btn--danger"
           onClick={onDelete}
         >
-          × Delete
+          <IconTrash size={14} /> Delete
         </button>
       )}
       <button type="button" className="bulkbar__btn bulkbar__btn--ghost" onClick={onClear}>

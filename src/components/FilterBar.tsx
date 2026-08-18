@@ -1,6 +1,7 @@
 import type { ViewId } from "../types";
 import type { DateRange, SnippetFilters } from "../lib/search";
 import { hasFilters } from "../lib/search";
+import { IconHeart, IconBookmark, IconArchive } from "./Icons";
 
 interface FilterBarProps {
   view: ViewId;
@@ -44,7 +45,8 @@ export default function FilterBar({
         onClick={() => toggle("favorite")}
         aria-pressed={filters.favorite === true}
       >
-        ★ Favorites
+        <IconHeart size={12} filled={filters.favorite === true} />
+        <span>Favorites</span>
       </button>
       <button
         type="button"
@@ -56,7 +58,8 @@ export default function FilterBar({
         onClick={() => toggle("pinned")}
         aria-pressed={filters.pinned === true}
       >
-        📌 Pinned
+        <IconBookmark size={12} filled={filters.pinned === true} />
+        <span>Pinned</span>
       </button>
       {view !== "archive" && (
         <button
@@ -69,7 +72,8 @@ export default function FilterBar({
           onClick={() => toggle("includeArchived")}
           aria-pressed={filters.includeArchived === true}
         >
-          ▣ Archived
+          <IconArchive size={12} />
+          <span>Archived</span>
         </button>
       )}
       {tags.length > 0 && (

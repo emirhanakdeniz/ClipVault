@@ -6,6 +6,7 @@ import QuickCapture from "./components/QuickCapture";
 import SnippetEditor from "./components/SnippetEditor";
 import SnippetListView from "./views/SnippetListView";
 import StatisticsView from "./views/StatisticsView";
+import SettingsView from "./views/SettingsView";
 import BulkActionBar from "./components/BulkActionBar";
 import FilterBar from "./components/FilterBar";
 import ShortcutSettings from "./components/ShortcutSettings";
@@ -17,9 +18,11 @@ import useGlobalQuickCapture from "./hooks/useGlobalQuickCapture";
 import useClipboardHistory from "./hooks/useClipboardHistory";
 import { useVault } from "./hooks/useVault";
 import { useSnippets } from "./hooks/useSnippets";
+import { useTheme } from "./hooks/useTheme";
 
 export default function App() {
   const store = useSnippets();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [vaultModalMode, setVaultModalMode] = useState<VaultModalMode | null>(
     null,
   );
@@ -113,7 +116,7 @@ export default function App() {
             + New
           </button>
         </div>
-        {store.activeView !== "statistics" && (
+        {store.activeView !== "statistics" && store.activeView !== "settings" && (
           <FilterBar
             view={store.activeView}
             filters={store.filters}
@@ -151,7 +154,20 @@ export default function App() {
           </div>
         )}
         <div className="view">
-          {store.activeView === "statistics" ? (
+          {store.activeView === "settings" ? (
+            <SettingsView
+              theme={theme}
+              resolvedTheme={resolvedTheme}
+              onSetTheme={setTheme}
+              vaultStatus={vault.status}
+              onOpenVaultModal={(mode) => setVaultModalMode(mode)}
+              onLockVault={vault.lock}
+              onExport={store.handleExport}
+              onImport={store.handleImport}
+              globalQuickCapture={globalQuickCapture}
+              clipboardHistory={clipboardHistory}
+            />
+          ) : store.activeView === "statistics" ? (
             <StatisticsView
               onSelectSnippet={(id) => {
                 store.setActiveView("snippets");

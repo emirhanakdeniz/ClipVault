@@ -51,6 +51,12 @@ const VIEW_METADATA: Record<
     emptyTitle: "Statistics",
     emptyHint: "View your local usage statistics.",
   },
+  settings: {
+    label: "Settings",
+    emptyGlyph: "⚙",
+    emptyTitle: "Settings",
+    emptyHint: "Configure your preferences.",
+  },
 };
 
 export default function SnippetListView({

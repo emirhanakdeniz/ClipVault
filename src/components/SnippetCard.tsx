@@ -2,6 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import type { Snippet } from "../types";
 import { relativeTime } from "../lib/time";
 import { copyText } from "../lib/clipboard";
+import {
+  IconHeart,
+  IconBookmark,
+  IconLock,
+  IconLockOpen,
+  IconArchive,
+  IconRestore,
+  IconTrash,
+  IconCopy,
+  IconCheck,
+} from "./Icons";
 
 interface SnippetCardProps {
   snippet: Snippet;
@@ -66,47 +77,48 @@ export default function SnippetCard({
     });
   }
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect?.(snippet.id);
+    }
+  }
+
   return (
     <article
-      className={`card card--${snippet.type}${selected ? " card--selected" : ""}`}
-      style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
-      tabIndex={0}
+      className={selected ? "card card--selected" : "card"}
       onClick={() => onSelect?.(snippet.id)}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+      role="button"
+      aria-label={`Snippet: ${snippet.title}`}
+      data-index={index}
     >
       <header className="card__header">
         {onToggleBulk && (
           <input
             type="checkbox"
-            className={
-              bulkSelected
-                ? "card__check card__check--checked"
-                : "card__check"
-            }
+            className="card__bulk-checkbox"
             checked={bulkSelected}
-            onChange={() => onToggleBulk(snippet.id)}
-            onClick={(event) => event.stopPropagation()}
+            onChange={(e) => {
+              e.stopPropagation();
+              onToggleBulk(snippet.id);
+            }}
+            onClick={(e) => e.stopPropagation()}
             aria-label={`Select ${snippet.title} for bulk actions`}
           />
         )}
-        <h3 className="card__title">
-          {snippet.sensitive && (
-            <span
-              className="card__sensitive-badge"
-              title="Sensitive — content is hidden until revealed"
-            >
-              🔒
-            </span>
-          )}
+        <h3 className="card__title" title={snippet.title}>
           {snippet.title}
         </h3>
-        <div className="card__actions">
+        <div className="card__actions" onClick={(e) => e.stopPropagation()}>
           {onToggleSensitive && (
             <button
               type="button"
               className={
                 snippet.sensitive
-                  ? "card__lock card__lock--active"
-                  : "card__lock"
+                  ? "card__btn card__btn--lock card__btn--active"
+                  : "card__btn card__btn--lock"
               }
               onClick={() => onToggleSensitive(snippet.id)}
               aria-label={
@@ -117,13 +129,19 @@ export default function SnippetCard({
               aria-pressed={snippet.sensitive}
               title={snippet.sensitive ? "Remove sensitive mark" : "Mark as sensitive"}
             >
-              🔒
+              {snippet.sensitive ? (
+                <IconLock size={15} />
+              ) : (
+                <IconLockOpen size={15} />
+              )}
             </button>
           )}
           <button
             type="button"
             className={
-              snippet.pinned ? "card__pin card__pin--active" : "card__pin"
+              snippet.pinned
+                ? "card__btn card__btn--pin card__btn--active"
+                : "card__btn card__btn--pin"
             }
             onClick={() => onTogglePin(snippet.id)}
             aria-label={
@@ -132,15 +150,16 @@ export default function SnippetCard({
                 : `Pin ${snippet.title}`
             }
             aria-pressed={snippet.pinned}
+            title={snippet.pinned ? "Unpin snippet" : "Pin to top"}
           >
-            📌
+            <IconBookmark size={15} filled={snippet.pinned} />
           </button>
           <button
             type="button"
             className={
               snippet.favorite
-                ? "card__star card__star--active"
-                : "card__star"
+                ? "card__btn card__btn--heart card__btn--active"
+                : "card__btn card__btn--heart"
             }
             onClick={() => onToggleFavorite(snippet.id)}
             aria-label={
@@ -149,39 +168,41 @@ export default function SnippetCard({
                 : `Add ${snippet.title} to favorites`
             }
             aria-pressed={snippet.favorite}
+            title={snippet.favorite ? "Favorited" : "Add to favorites"}
           >
-            ★
+            <IconHeart size={15} filled={snippet.favorite} />
           </button>
           {onArchive && (
             <button
               type="button"
-              className="card__archive"
+              className="card__btn card__btn--archive"
               onClick={() => onArchive(snippet.id)}
               aria-label={`Archive ${snippet.title}`}
-              title="Archive"
+              title="Archive snippet"
             >
-              ⌄
+              <IconArchive size={15} />
             </button>
           )}
           {onRestore && (
             <button
               type="button"
-              className="card__restore"
+              className="card__btn card__btn--restore"
               onClick={() => onRestore(snippet.id)}
               aria-label={`Restore ${snippet.title}`}
-              title="Restore"
+              title="Restore from archive"
             >
-              ↥
+              <IconRestore size={15} />
             </button>
           )}
           {onDelete && (
             <button
               type="button"
-              className="card__delete"
+              className="card__btn card__btn--delete"
               onClick={() => onDelete(snippet.id)}
               aria-label={`Delete ${snippet.title}`}
+              title="Delete permanently"
             >
-              ×
+              <IconTrash size={15} />
             </button>
           )}
         </div>
@@ -254,12 +275,24 @@ export default function SnippetCard({
           className={
             copied ? "card__copy card__copy--done" : "card__copy"
           }
-          onClick={handleCopy}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCopy();
+          }}
         >
-          {copied ? "Copied" : "Copy"}
+          {copied ? (
+            <>
+              <IconCheck size={13} />
+              <span>Copied</span>
+            </>
+          ) : (
+            <>
+              <IconCopy size={13} />
+              <span>Copy</span>
+            </>
+          )}
         </button>
       </footer>
     </article>
   );
 }
-

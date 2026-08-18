@@ -1,5 +1,12 @@
 import type { ReactNode } from "react";
 import type { ViewId } from "../types";
+import {
+  IconSnippets,
+  IconHeart,
+  IconArchive,
+  IconStats,
+  IconSettings,
+} from "./Icons";
 
 export type { ViewId };
 
@@ -24,20 +31,52 @@ export default function Sidebar({
   onImport,
   footerExtra,
 }: SidebarProps) {
-  const navItems: { id: ViewId; label: string; glyph: string; count?: number }[] =
-    [
-      { id: "snippets", label: "Snippets", glyph: "▤", count: snippetCount },
-      { id: "favorites", label: "Favorites", glyph: "★", count: favoriteCount },
-      { id: "archive", label: "Archive", glyph: "▣", count: archiveCount },
-      { id: "statistics", label: "Statistics", glyph: "📊" },
-    ];
+  const navItems: {
+    id: ViewId;
+    label: string;
+    icon: ReactNode;
+    count?: number;
+  }[] = [
+    {
+      id: "snippets",
+      label: "Snippets",
+      icon: <IconSnippets size={16} />,
+      count: snippetCount,
+    },
+    {
+      id: "favorites",
+      label: "Favorites",
+      icon: <IconHeart size={16} />,
+      count: favoriteCount,
+    },
+    {
+      id: "archive",
+      label: "Archive",
+      icon: <IconArchive size={16} />,
+      count: archiveCount,
+    },
+    {
+      id: "statistics",
+      label: "Statistics",
+      icon: <IconStats size={16} />,
+    },
+    {
+      id: "settings",
+      label: "Settings",
+      icon: <IconSettings size={16} />,
+    },
+  ];
 
   return (
     <nav className="sidebar" aria-label="Main">
-      <div className="sidebar__brand">
-        <span className="sidebar__brand-glyph" aria-hidden="true">
-          ⌗
-        </span>
+      <div className="sidebar__brand" onClick={() => onSelect("snippets")} role="button" tabIndex={0}>
+        <img
+          src="/app-icon.png"
+          alt="ClipVault"
+          className="sidebar__brand-logo"
+          width="24"
+          height="24"
+        />
         <span className="sidebar__brand-name">ClipVault</span>
       </div>
       <div className="sidebar__nav">
@@ -53,8 +92,8 @@ export default function Sidebar({
             onClick={() => onSelect(item.id)}
             aria-current={item.id === activeView ? "page" : undefined}
           >
-            <span className="sidebar__item-glyph" aria-hidden="true">
-              {item.glyph}
+            <span className="sidebar__item-icon" aria-hidden="true">
+              {item.icon}
             </span>
             <span className="sidebar__item-label">{item.label}</span>
             {item.count !== undefined && (
@@ -73,7 +112,7 @@ export default function Sidebar({
             onClick={onExport}
             title="Export all snippets to a JSON file"
           >
-            ↥ Export
+            Export
           </button>
           <button
             type="button"
@@ -81,7 +120,7 @@ export default function Sidebar({
             onClick={onImport}
             title="Import snippets from a ClipVault JSON file"
           >
-            ↧ Import
+            Import
           </button>
         </div>
       </div>
