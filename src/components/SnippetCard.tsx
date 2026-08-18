@@ -28,6 +28,7 @@ interface SnippetCardProps {
   onDelete?: (id: string) => void;
   onUnlockVault?: () => void;
   onCopy?: (id: string) => void;
+  onContextMenu?: (event: React.MouseEvent, snippet: Snippet) => void;
   index: number;
 }
 
@@ -45,8 +46,10 @@ export default function SnippetCard({
   onDelete,
   onUnlockVault,
   onCopy,
+  onContextMenu,
   index,
 }: SnippetCardProps) {
+  const cardRef = useRef<HTMLElement>(null);
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
   // Reveal state is per-snippet and resets whenever a different snippet mounts,
@@ -60,6 +63,13 @@ export default function SnippetCard({
   useEffect(() => {
     setRevealed(false);
   }, [snippet.id, snippet.sensitive, snippet.locked]);
+
+  // Smoothly scroll active card into view during keyboard navigation
+  useEffect(() => {
+    if (selected && cardRef.current) {
+      cardRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selected]);
 
   function handleCopy() {
     if (snippet.locked) {
@@ -86,8 +96,13 @@ export default function SnippetCard({
 
   return (
     <article
+      ref={cardRef}
       className={selected ? "card card--selected" : "card"}
       onClick={() => onSelect?.(snippet.id)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        onContextMenu?.(event, snippet);
+      }}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"
@@ -127,7 +142,11 @@ export default function SnippetCard({
                   : `Mark ${snippet.title} as sensitive`
               }
               aria-pressed={snippet.sensitive}
-              title={snippet.sensitive ? "Remove sensitive mark" : "Mark as sensitive"}
+              title={
+                snippet.sensitive
+                  ? "Sensitive snippet (encrypted when vault locked)"
+                  : "Mark as sensitive"
+              }
             >
               {snippet.sensitive ? (
                 <IconLock size={15} />
@@ -150,7 +169,7 @@ export default function SnippetCard({
                 : `Pin ${snippet.title}`
             }
             aria-pressed={snippet.pinned}
-            title={snippet.pinned ? "Unpin snippet" : "Pin to top"}
+            title={snippet.pinned ? "Unpin snippet (P)" : "Pin to top (P)"}
           >
             <IconBookmark size={15} filled={snippet.pinned} />
           </button>
@@ -168,7 +187,11 @@ export default function SnippetCard({
                 : `Add ${snippet.title} to favorites`
             }
             aria-pressed={snippet.favorite}
-            title={snippet.favorite ? "Favorited" : "Add to favorites"}
+            title={
+              snippet.favorite
+                ? "Favorited (Ctrl+D / F)"
+                : "Add to favorites (Ctrl+D / F)"
+            }
           >
             <IconHeart size={15} filled={snippet.favorite} />
           </button>
@@ -178,7 +201,7 @@ export default function SnippetCard({
               className="card__btn card__btn--archive"
               onClick={() => onArchive(snippet.id)}
               aria-label={`Archive ${snippet.title}`}
-              title="Archive snippet"
+              title="Archive snippet (Del)"
             >
               <IconArchive size={15} />
             </button>
@@ -275,6 +298,7 @@ export default function SnippetCard({
           className={
             copied ? "card__copy card__copy--done" : "card__copy"
           }
+          title="Copy content to clipboard (Ctrl+C)"
           onClick={(e) => {
             e.stopPropagation();
             handleCopy();

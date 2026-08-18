@@ -13,6 +13,8 @@ import ShortcutSettings from "./components/ShortcutSettings";
 import ClipboardHistorySettings from "./components/ClipboardHistorySettings";
 import VaultSettings from "./components/VaultSettings";
 import VaultModal, { type VaultModalMode } from "./components/VaultModal";
+import ContextMenu, { type ContextMenuPosition } from "./components/ContextMenu";
+import ShortcutsHelpModal from "./components/ShortcutsHelpModal";
 import useShortcuts from "./hooks/useShortcuts";
 import useGlobalQuickCapture from "./hooks/useGlobalQuickCapture";
 import useClipboardHistory from "./hooks/useClipboardHistory";
@@ -28,6 +30,10 @@ export default function App() {
   const [vaultModalMode, setVaultModalMode] = useState<VaultModalMode | null>(
     null,
   );
+  const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(
+    null,
+  );
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
 
   const vault = useVault(() => {
     void store.reloadSnippets();
@@ -45,9 +51,40 @@ export default function App() {
     toggleFavorite: () => {
       if (store.selectedId) store.toggleFavorite(store.selectedId);
     },
+    togglePin: () => {
+      if (store.selectedId) store.togglePin(store.selectedId);
+    },
+    editSelected: () => {
+      if (store.selectedId) {
+        document.querySelector<HTMLInputElement>(".snippeteditor__input")?.focus();
+      }
+    },
+    archiveSelected: () => {
+      if (store.selectedId) {
+        if (store.activeView === "archive") {
+          void store.handleDelete(store.selectedId);
+        } else {
+          void store.handleArchive(store.selectedId);
+        }
+      }
+    },
+    openSettings: () => store.setActiveView("settings"),
+    openHelp: () => setShortcutsHelpOpen((prev) => !prev),
     selectPrevious: store.selectPrevious,
     selectNext: store.selectNext,
     clearSelection: () => {
+      if (contextMenu) {
+        setContextMenu(null);
+        return;
+      }
+      if (shortcutsHelpOpen) {
+        setShortcutsHelpOpen(false);
+        return;
+      }
+      if (vaultModalMode) {
+        setVaultModalMode(null);
+        return;
+      }
       store.setSelectedId(null);
       store.setBulkIds([]);
     },
@@ -79,6 +116,7 @@ export default function App() {
         archiveCount={store.archiveCount}
         onExport={store.handleExport}
         onImport={store.handleImport}
+        onOpenShortcutsHelp={() => setShortcutsHelpOpen(true)}
         footerExtra={
           <>
             <VaultSettings
@@ -205,11 +243,49 @@ export default function App() {
                 onDelete={store.handleDelete}
                 onUnlockVault={() => setVaultModalMode("unlock")}
                 onCopy={store.trackCopy}
+                onContextMenu={(event, snippet) =>
+                  setContextMenu({
+                    x: event.clientX,
+                    y: event.clientY,
+                    snippet,
+                  })
+                }
               />
             </>
           )}
         </div>
       </main>
+
+      {contextMenu && (
+        <ContextMenu
+          position={contextMenu}
+          onClose={() => setContextMenu(null)}
+          onCopy={(id) => {
+            const item = store.snippets.find((s) => s.id === id);
+            if (item) void store.copySelected();
+          }}
+          onEdit={(id) => {
+            store.setSelectedId(id);
+            window.setTimeout(() => {
+              document
+                .querySelector<HTMLInputElement>(".snippeteditor__input")
+                ?.focus();
+            }, 50);
+          }}
+          onToggleFavorite={store.toggleFavorite}
+          onTogglePin={store.togglePin}
+          onToggleSensitive={store.toggleSensitive}
+          onArchive={store.handleArchive}
+          onRestore={store.handleRestore}
+          onDelete={store.handleDelete}
+          isArchiveView={store.activeView === "archive"}
+        />
+      )}
+
+      <ShortcutsHelpModal
+        isOpen={shortcutsHelpOpen}
+        onClose={() => setShortcutsHelpOpen(false)}
+      />
 
       {vaultModalMode && (
         <VaultModal

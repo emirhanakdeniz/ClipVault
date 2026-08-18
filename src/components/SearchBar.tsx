@@ -18,6 +18,7 @@ export default function SearchBar({ query, onChange }: SearchBarProps) {
         value={query}
         onChange={(event) => onChange(event.target.value)}
         aria-label="Search snippets"
+        title="Search snippets (Ctrl+K)"
       />
       {query.length > 0 ? (
         <button

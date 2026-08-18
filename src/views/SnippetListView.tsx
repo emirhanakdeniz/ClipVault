@@ -21,6 +21,7 @@ export interface SnippetListViewProps {
   onDelete?: (id: string) => void;
   onUnlockVault?: () => void;
   onCopy?: (id: string) => void;
+  onContextMenu?: (event: React.MouseEvent, snippet: Snippet) => void;
 }
 
 const VIEW_METADATA: Record<
@@ -76,6 +77,7 @@ export default function SnippetListView({
   onDelete,
   onUnlockVault,
   onCopy,
+  onContextMenu,
 }: SnippetListViewProps) {
   const visible = getVisibleSnippets(snippets, query, {
     favoritesOnly: view === "favorites",
@@ -119,6 +121,7 @@ export default function SnippetListView({
               onDelete={view === "archive" ? onDelete : undefined}
               onUnlockVault={onUnlockVault}
               onCopy={onCopy}
+              onContextMenu={onContextMenu}
               index={index}
             />
           ))}

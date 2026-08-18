@@ -11,6 +11,11 @@ export interface ShortcutActions {
   newSnippet: () => void;
   copySelected: () => void;
   toggleFavorite: () => void;
+  togglePin?: () => void;
+  editSelected?: () => void;
+  archiveSelected?: () => void;
+  openSettings?: () => void;
+  openHelp?: () => void;
   selectPrevious: () => void;
   selectNext: () => void;
   clearSelection: () => void;
@@ -29,23 +34,34 @@ export default function useShortcuts(actions: ShortcutActions) {
     function onKeyDown(event: KeyboardEvent) {
       const actions = actionsRef.current;
 
-      // Focus search works even while typing (matches the original behavior).
+      // Global shortcuts that work anywhere (even while typing)
       if (matchesShortcut(event, SHORTCUTS.focusSearch)) {
         event.preventDefault();
         actions.focusSearch();
         return;
       }
 
-      // Quick capture focus also works while typing, so capturing never
-      // requires leaving the keyboard.
       if (matchesShortcut(event, SHORTCUTS.focusQuickCapture)) {
         event.preventDefault();
         actions.focusQuickCapture();
         return;
       }
 
-      // Never hijack keystrokes aimed at a text field or form control.
-      if (isEditableTarget(event)) return;
+      if (matchesShortcut(event, SHORTCUTS.openSettings)) {
+        event.preventDefault();
+        actions.openSettings?.();
+        return;
+      }
+
+      // Never hijack typing in text fields or form controls for non-global shortcuts
+      if (isEditableTarget(event)) {
+        if (event.key === "Escape") {
+          // Blur input when pressing Escape inside search/quickcapture
+          (event.target as HTMLElement)?.blur();
+          actions.clearSelection();
+        }
+        return;
+      }
 
       if (matchesShortcut(event, SHORTCUTS.newSnippet)) {
         event.preventDefault();
@@ -60,11 +76,33 @@ export default function useShortcuts(actions: ShortcutActions) {
       }
 
       if (matchesShortcut(event, SHORTCUTS.copySelected)) {
-        // Fall through to the native copy when the user has highlighted
-        // text, so the OS clipboard behaviour is preserved.
         if (window.getSelection()?.toString()) return;
         event.preventDefault();
         actions.copySelected();
+        return;
+      }
+
+      if (event.key === "?" || event.key === "F1") {
+        event.preventDefault();
+        actions.openHelp?.();
+        return;
+      }
+
+      if (event.key === "p" || event.key === "P") {
+        event.preventDefault();
+        actions.togglePin?.();
+        return;
+      }
+
+      if (event.key === "f" || event.key === "F") {
+        event.preventDefault();
+        actions.toggleFavorite();
+        return;
+      }
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        actions.archiveSelected?.();
         return;
       }
 

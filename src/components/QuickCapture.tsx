@@ -92,6 +92,7 @@ export default function QuickCapture({
         }}
         onKeyDown={handleKeyDown}
         aria-label="Quick capture content"
+        title="Quick capture (Ctrl+I, Enter to save, Esc to clear)"
       />
       {notice ? (
         <span className="quickcapture__notice" role="status">

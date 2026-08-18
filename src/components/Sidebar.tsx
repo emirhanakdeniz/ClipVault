@@ -18,6 +18,7 @@ interface SidebarProps {
   archiveCount: number;
   onExport: () => void;
   onImport: () => void;
+  onOpenShortcutsHelp?: () => void;
   footerExtra?: ReactNode;
 }
 
@@ -29,6 +30,7 @@ export default function Sidebar({
   archiveCount,
   onExport,
   onImport,
+  onOpenShortcutsHelp,
   footerExtra,
 }: SidebarProps) {
   const navItems: {
@@ -36,6 +38,7 @@ export default function Sidebar({
     label: string;
     icon: ReactNode;
     count?: number;
+    title?: string;
   }[] = [
     {
       id: "snippets",
@@ -64,6 +67,7 @@ export default function Sidebar({
       id: "settings",
       label: "Settings",
       icon: <IconSettings size={16} />,
+      title: "Settings (Ctrl+,)",
     },
   ];
 
@@ -90,6 +94,7 @@ export default function Sidebar({
                 : "sidebar__item"
             }
             onClick={() => onSelect(item.id)}
+            title={item.title}
             aria-current={item.id === activeView ? "page" : undefined}
           >
             <span className="sidebar__item-icon" aria-hidden="true">
@@ -106,6 +111,16 @@ export default function Sidebar({
         {footerExtra}
         <span className="sidebar__footer-count">{snippetCount} saved</span>
         <div className="sidebar__footer-actions">
+          {onOpenShortcutsHelp && (
+            <button
+              type="button"
+              className="sidebar__footer-btn"
+              onClick={onOpenShortcutsHelp}
+              title="Keyboard shortcuts cheat sheet (? / F1)"
+            >
+              Shortcuts (?)
+            </button>
+          )}
           <button
             type="button"
             className="sidebar__footer-btn"

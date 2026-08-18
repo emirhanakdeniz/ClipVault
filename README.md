@@ -13,12 +13,20 @@ Designed for developers and power users who want a fast, keyboard-driven way to 
 - **🔍 Real-Time Search & Filtering**: Instant search across titles, content, and tags with filters for types, tags, and date sorting.
 - **🛡️ Duplicate Prevention**: Whitespace-normalized duplicate detection prevents redundant entries without accidental overwrites.
 - **📦 Bulk Operations**: Select multiple items to bulk archive, favorite, or delete.
-- **⌨️ Keyboard Shortcuts**:
-  - `Ctrl+K` (`Cmd+K`): Focus Search
+- **⌨️ Keyboard Shortcuts & Power User Navigation**:
+  - `Ctrl+K` (`Cmd+K`): Focus Search bar
   - `Ctrl+I` (`Cmd+I`): Focus Quick Capture
   - `Ctrl+N` (`Cmd+N`): Open New Snippet Form
-  - `Ctrl+C` (`Cmd+C`): Copy Selected Snippet
-  - `Ctrl+D` (`Cmd+D`): Toggle Favorite
+  - `Ctrl+,` (`Cmd+,`): Jump to Settings
+  - `?` or `F1`: Floating Keyboard Shortcuts cheat sheet modal
+  - `↑` / `↓`: Navigate snippets with smooth auto-scrolling
+  - `Enter`: Open selected snippet in full editor
+  - `Ctrl+C` (`Cmd+C`): Copy selected snippet to clipboard
+  - `Ctrl+D` (`Cmd+D`) or `F`: Toggle favorite
+  - `P`: Pin / unpin to top
+  - `Del` or `Backspace`: Archive snippet (or permanently delete in Archive view)
+  - `Esc`: Clear search / blur input, close editor, dismiss modals & context menus
+- **🖱️ Native Desktop Context Menu**: Right-click any snippet card for instant access to copy, edit, favorite, pin, sensitive toggle, archive, and delete with keyboard shortcut hints.
 - **🌍 Global Quick Capture Shortcut** *(optional)*: A system-wide shortcut (default suggestion `Ctrl+Alt+V`, disabled by default) that opens/focuses ClipVault's Quick Capture from any application. Configure or re-record it in the sidebar; the choice is persisted locally, conflicts with other apps are reported instead of failing silently, and the feature stays off if registration fails.
 - **📋 Clipboard History** *(optional)*: Automatically capture text you copy system-wide. The history limit is configurable (25–500 entries, default 100) and persisted. When the limit is exceeded the **oldest auto-captured entries are removed first** — manually created snippets, favorites, and pinned snippets are never removed automatically.
 - **🚀 Auto Start with Windows** *(optional)*: Optionally launch ClipVault on Windows startup in the background. Defaults to off; toggleable with one click in Settings with zero idle background CPU overhead.

@@ -142,19 +142,20 @@ export default function SnippetEditor({
       document
         .querySelector<HTMLTextAreaElement>(".snippeteditor__textarea")
         ?.focus();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      onClose?.();
     }
   }
 
   function handleContentKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    // Ctrl/Cmd+Enter saves immediately; Escape returns to the title field.
+    // Ctrl/Cmd+Enter saves immediately; Escape closes the editor.
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       void save(draftRef.current.title, draftRef.current.content);
     } else if (event.key === "Escape") {
       event.preventDefault();
-      document
-        .querySelector<HTMLInputElement>(".snippeteditor__input")
-        ?.focus();
+      onClose?.();
     }
   }
 

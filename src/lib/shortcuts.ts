@@ -12,6 +12,7 @@ export const SHORTCUTS = {
   newSnippet: { combo: "Ctrl+N", description: "New snippet" },
   copySelected: { combo: "Ctrl+C", description: "Copy selected snippet" },
   toggleFavorite: { combo: "Ctrl+D", description: "Toggle favorite" },
+  openSettings: { combo: "Ctrl+,", description: "Open settings" },
 } as const;
 
 export type ShortcutId = keyof typeof SHORTCUTS;
