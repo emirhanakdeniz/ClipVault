@@ -8,6 +8,8 @@ interface ArchiveViewProps {
   query: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  bulkIds: string[];
+  onToggleBulk: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
   onRestore: (id: string) => void;
@@ -19,6 +21,8 @@ export default function ArchiveView({
   query,
   selectedId,
   onSelect,
+  bulkIds,
+  onToggleBulk,
   onToggleFavorite,
   onTogglePin,
   onRestore,
@@ -50,6 +54,8 @@ export default function ArchiveView({
               snippet={snippet}
               selected={snippet.id === selectedId}
               onSelect={onSelect}
+              bulkSelected={bulkIds.includes(snippet.id)}
+              onToggleBulk={onToggleBulk}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
               onRestore={onRestore}

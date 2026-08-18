@@ -8,6 +8,8 @@ interface FavoritesViewProps {
   query: string;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  bulkIds: string[];
+  onToggleBulk: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
   onArchive: (id: string) => void;
@@ -18,6 +20,8 @@ export default function FavoritesView({
   query,
   selectedId,
   onSelect,
+  bulkIds,
+  onToggleBulk,
   onToggleFavorite,
   onTogglePin,
   onArchive,
@@ -48,6 +52,8 @@ export default function FavoritesView({
               snippet={snippet}
               selected={snippet.id === selectedId}
               onSelect={onSelect}
+              bulkSelected={bulkIds.includes(snippet.id)}
+              onToggleBulk={onToggleBulk}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
               onArchive={onArchive}

@@ -412,6 +412,26 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Bulk-selection checkbox: quiet until checked */
+.card__check {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--brass);
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 120ms ease;
+}
+
+.card__check:hover {
+  opacity: 1;
+}
+
+.card__check--checked {
+  opacity: 1;
+}
+
 .card--selected {
   border-color: var(--steel);
   box-shadow: 0 0 0 3px rgba(111, 157, 196, 0.18);
@@ -606,6 +626,64 @@ body {
   background-color: var(--brass-dim);
   color: var(--brass);
 }
+
+/* Bulk action bar: rendered only while snippets are bulk-selected */
+.bulkbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 8px 12px;
+  border: 1px solid var(--brass);
+  border-radius: 8px;
+  background-color: var(--brass-dim);
+  animation: card-in 260ms ease both;
+}
+
+.bulkbar__count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--brass);
+  margin-right: 4px;
+}
+
+.bulkbar__btn {
+  padding: 4px 10px;
+  border: 1px solid rgba(212, 162, 78, 0.4);
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.bulkbar__btn:hover {
+  border-color: var(--brass);
+  color: var(--brass);
+}
+
+.bulkbar__btn--danger {
+  border-color: rgba(196, 111, 111, 0.4);
+}
+
+.bulkbar__btn--danger:hover {
+  border-color: #c46f6f;
+  color: #c46f6f;
+}
+
+.bulkbar__btn--ghost {
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.bulkbar__btn--ghost:hover {
+  border-color: transparent;
+  color: var(--text);
+}
+
 
 /* ---------- Empty states ---------- */
 .empty-state {

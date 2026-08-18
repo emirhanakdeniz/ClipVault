@@ -7,6 +7,8 @@ interface SnippetCardProps {
   snippet: Snippet;
   selected?: boolean;
   onSelect?: (id: string) => void;
+  bulkSelected?: boolean;
+  onToggleBulk?: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
   onArchive?: (id: string) => void;
@@ -19,6 +21,8 @@ export default function SnippetCard({
   snippet,
   selected = false,
   onSelect,
+  bulkSelected = false,
+  onToggleBulk,
   onToggleFavorite,
   onTogglePin,
   onArchive,
@@ -52,6 +56,20 @@ export default function SnippetCard({
       onClick={() => onSelect?.(snippet.id)}
     >
       <header className="card__header">
+        {onToggleBulk && (
+          <input
+            type="checkbox"
+            className={
+              bulkSelected
+                ? "card__check card__check--checked"
+                : "card__check"
+            }
+            checked={bulkSelected}
+            onChange={() => onToggleBulk(snippet.id)}
+            onClick={(event) => event.stopPropagation()}
+            aria-label={`Select ${snippet.title} for bulk actions`}
+          />
+        )}
         <h3 className="card__title">{snippet.title}</h3>
         <div className="card__actions">
           <button

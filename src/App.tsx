@@ -5,6 +5,7 @@ import NewSnippetForm from "./components/NewSnippetForm";
 import SnippetsView from "./views/SnippetsView";
 import FavoritesView from "./views/FavoritesView";
 import ArchiveView from "./views/ArchiveView";
+import BulkActionBar from "./components/BulkActionBar";
 import type { ViewId } from "./components/Sidebar";
 import type { Snippet, SnippetType } from "./types";
 import {
@@ -27,6 +28,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [bulkIds, setBulkIds] = useState<string[]>([]);
   const [duplicateNotice, setDuplicateNotice] = useState<string | null>(null);
 
   const active = snippets.filter((s) => !s.archived);
@@ -134,6 +136,56 @@ export default function App() {
     }
   }
 
+  function toggleBulk(id: string) {
+    setBulkIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  async function runBulk(
+    action: (id: string) => Promise<Snippet | null>,
+  ) {
+    const ids = [...bulkIds];
+    const results = await Promise.allSettled(ids.map(action));
+    const updatedById = new Map<string, Snippet>();
+    const removedIds = new Set<string>();
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        if (result.value) updatedById.set(ids[index], result.value);
+        else removedIds.add(ids[index]);
+      }
+    });
+    setSnippets((prev) =>
+      prev
+        .map((s) => updatedById.get(s.id) ?? s)
+        .filter((s) => !removedIds.has(s.id)),
+    );
+    const failed = results.filter((r) => r.status === "rejected");
+    setError(
+      failed.length > 0
+        ? `${failed.length} of ${ids.length} bulk actions failed`
+        : null,
+    );
+    setBulkIds([]);
+    setSelectedId((prev) => (ids.includes(prev ?? "") ? null : prev));
+  }
+
+  function bulkSetFavorite(favorite: boolean) {
+    return runBulk((id) => setFavorite(id, favorite));
+  }
+
+  function bulkArchive() {
+    return runBulk((id) => setArchived(id, true));
+  }
+
+  function bulkRestore() {
+    return runBulk((id) => setArchived(id, false));
+  }
+
+  function bulkDelete() {
+    return runBulk((id) => deleteSnippet(id).then(() => null));
+  }
+
   function selectNext() {
     if (visible.length === 0) return;
     const index = visible.findIndex((s) => s.id === selectedId);
@@ -163,14 +215,20 @@ export default function App() {
     },
     selectPrevious,
     selectNext,
-    clearSelection: () => setSelectedId(null),
+    clearSelection: () => {
+      setSelectedId(null);
+      setBulkIds([]);
+    },
   });
 
   return (
     <div className="app">
       <Sidebar
         activeView={activeView}
-        onSelect={setActiveView}
+        onSelect={(view) => {
+          setActiveView(view);
+          setBulkIds([]);
+        }}
         snippetCount={active.length}
         favoriteCount={favoriteCount}
         archiveCount={archiveCount}
@@ -204,12 +262,23 @@ export default function App() {
           </div>
         )}
         <div className="view">
+          <BulkActionBar
+            count={bulkIds.length}
+            view={activeView}
+            onSetFavorite={bulkSetFavorite}
+            onArchive={bulkArchive}
+            onRestore={bulkRestore}
+            onDelete={bulkDelete}
+            onClear={() => setBulkIds([])}
+          />
           {activeView === "snippets" && (
             <SnippetsView
               snippets={snippets}
               query={query}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              bulkIds={bulkIds}
+              onToggleBulk={toggleBulk}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
               onArchive={handleArchive}
@@ -221,6 +290,8 @@ export default function App() {
               query={query}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              bulkIds={bulkIds}
+              onToggleBulk={toggleBulk}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
               onArchive={handleArchive}
@@ -232,6 +303,8 @@ export default function App() {
               query={query}
               selectedId={selectedId}
               onSelect={setSelectedId}
+              bulkIds={bulkIds}
+              onToggleBulk={toggleBulk}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
               onRestore={handleRestore}
