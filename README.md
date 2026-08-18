@@ -20,6 +20,7 @@ Designed for developers and power users who want a fast, keyboard-driven way to 
   - `Ctrl+C` (`Cmd+C`): Copy Selected Snippet
   - `Ctrl+D` (`Cmd+D`): Toggle Favorite
 - **🌍 Global Quick Capture Shortcut** *(optional)*: A system-wide shortcut (default suggestion `Ctrl+Alt+V`, disabled by default) that opens/focuses ClipVault's Quick Capture from any application. Configure or re-record it in the sidebar; the choice is persisted locally, conflicts with other apps are reported instead of failing silently, and the feature stays off if registration fails.
+- **📋 Clipboard History** *(optional)*: Automatically capture text you copy system-wide. The history limit is configurable (25–500 entries, default 100) and persisted. When the limit is exceeded the **oldest auto-captured entries are removed first** — manually created snippets, favorites, and pinned snippets are never removed automatically.
 - **🔒 100% Local & Private**: All data is persisted locally in an embedded SQLite database (`rusqlite`) in your OS app data folder. Zero telemetry, zero cloud lock-in.
 - **💾 Import & Export**: Versioned JSON backup and restore with built-in schema validation and duplicate skipping.
 
