@@ -11,6 +11,7 @@ interface SnippetCardProps {
   onToggleBulk?: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onToggleSensitive?: (id: string) => void;
   onArchive?: (id: string) => void;
   onRestore?: (id: string) => void;
   onDelete?: (id: string) => void;
@@ -25,6 +26,7 @@ export default function SnippetCard({
   onToggleBulk,
   onToggleFavorite,
   onTogglePin,
+  onToggleSensitive,
   onArchive,
   onRestore,
   onDelete,
@@ -32,10 +34,17 @@ export default function SnippetCard({
 }: SnippetCardProps) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<number | undefined>(undefined);
+  // Reveal state is per-snippet and resets whenever a different snippet mounts,
+  // so sensitive content is always hidden again by default.
+  const [revealed, setRevealed] = useState(false);
 
   useEffect(() => {
     return () => window.clearTimeout(timer.current);
   }, []);
+
+  useEffect(() => {
+    setRevealed(false);
+  }, [snippet.id, snippet.sensitive]);
 
   function handleCopy() {
     copyText(snippet.content).then((ok) => {
@@ -70,8 +79,38 @@ export default function SnippetCard({
             aria-label={`Select ${snippet.title} for bulk actions`}
           />
         )}
-        <h3 className="card__title">{snippet.title}</h3>
+        <h3 className="card__title">
+          {snippet.sensitive && (
+            <span
+              className="card__sensitive-badge"
+              title="Sensitive — content is hidden until revealed"
+            >
+              🔒
+            </span>
+          )}
+          {snippet.title}
+        </h3>
         <div className="card__actions">
+          {onToggleSensitive && (
+            <button
+              type="button"
+              className={
+                snippet.sensitive
+                  ? "card__lock card__lock--active"
+                  : "card__lock"
+              }
+              onClick={() => onToggleSensitive(snippet.id)}
+              aria-label={
+                snippet.sensitive
+                  ? `Mark ${snippet.title} as not sensitive`
+                  : `Mark ${snippet.title} as sensitive`
+              }
+              aria-pressed={snippet.sensitive}
+              title={snippet.sensitive ? "Remove sensitive mark" : "Mark as sensitive"}
+            >
+              🔒
+            </button>
+          )}
           <button
             type="button"
             className={
@@ -138,7 +177,40 @@ export default function SnippetCard({
           )}
         </div>
       </header>
-      <pre className="card__preview">{snippet.content}</pre>
+      {snippet.sensitive && !revealed ? (
+        <div className="card__masked">
+          <span className="card__masked-dots" aria-hidden="true">
+            ••••••••••••
+          </span>
+          <span className="card__masked-note">Sensitive content hidden</span>
+          <button
+            type="button"
+            className="card__reveal"
+            onClick={(event) => {
+              event.stopPropagation();
+              setRevealed(true);
+            }}
+          >
+            Reveal
+          </button>
+        </div>
+      ) : snippet.sensitive && revealed ? (
+        <div className="card__revealed">
+          <pre className="card__preview">{snippet.content}</pre>
+          <button
+            type="button"
+            className="card__reveal card__reveal--on"
+            onClick={(event) => {
+              event.stopPropagation();
+              setRevealed(false);
+            }}
+          >
+            Hide
+          </button>
+        </div>
+      ) : (
+        <pre className="card__preview">{snippet.content}</pre>
+      )}
       <footer className="card__meta">
         <span className={`card__type card__type--${snippet.type}`}>
           {snippet.type}

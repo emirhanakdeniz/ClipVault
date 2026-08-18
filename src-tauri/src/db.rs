@@ -102,6 +102,23 @@ pub fn init(app: &tauri::AppHandle) -> Result<Db, String> {
         )
         .map_err(|e| e.to_string())?;
     }
+    // Same migration pattern for the sensitive column. Sensitive snippets keep
+    // their content hidden in the UI and are excluded from clipboard matching.
+    let has_sensitive = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('snippets') WHERE name = 'sensitive'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map_err(|e| e.to_string())?
+        > 0;
+    if !has_sensitive {
+        conn.execute(
+            "ALTER TABLE snippets ADD COLUMN sensitive INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     // Generic key/value settings store (e.g. global shortcut preferences).
     conn.execute(
         "CREATE TABLE IF NOT EXISTS settings (

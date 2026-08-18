@@ -14,6 +14,7 @@ interface FavoritesViewProps {
   onToggleBulk: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onToggleSensitive?: (id: string) => void;
   onArchive: (id: string) => void;
 }
 
@@ -27,6 +28,7 @@ export default function FavoritesView({
   onToggleBulk,
   onToggleFavorite,
   onTogglePin,
+  onToggleSensitive,
   onArchive,
 }: FavoritesViewProps) {
   const visible = getVisibleSnippets(snippets, query, {
@@ -62,6 +64,7 @@ export default function FavoritesView({
               onToggleBulk={onToggleBulk}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
+              onToggleSensitive={onToggleSensitive}
               onArchive={onArchive}
               index={index}
             />

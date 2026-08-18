@@ -153,6 +153,14 @@ export default function SnippetEditor({
     >
       <div className="snippeteditor__heading">
         <span className="snippeteditor__heading-label">Edit snippet</span>
+        {snippet.sensitive && (
+          <span
+            className="snippeteditor__sensitive"
+            title="This snippet is marked sensitive — its content is hidden in previews until revealed"
+          >
+            🔒 Sensitive
+          </span>
+        )}
         <span
           className={`snippeteditor__status${
             saveState === "saved" ? " snippeteditor__status--saved" : ""

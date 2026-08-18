@@ -23,6 +23,7 @@ fn main() {
             commands::set_favorite,
             commands::set_pinned,
             commands::set_archived,
+            commands::set_sensitive,
             commands::delete_snippet,
             commands::export_snippets,
             commands::import_snippets,

@@ -15,5 +15,7 @@ export interface Snippet {
   createdAt: number;
   updatedAt: number;
   source: SnippetSource;
+  /** Sensitive snippets have their content hidden until explicitly revealed. */
+  sensitive: boolean;
 }
 

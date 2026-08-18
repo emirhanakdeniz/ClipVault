@@ -18,6 +18,7 @@ import {
   setFavorite,
   setPinned,
   setArchived,
+  setSensitive,
   deleteSnippet,
   exportSnippets,
   importSnippets,
@@ -140,6 +141,18 @@ export default function App() {
     if (!current) return;
     try {
       const updated = await setPinned(id, !current.pinned);
+      setSnippets((prev) => prev.map((s) => (s.id === id ? updated : s)));
+      setError(null);
+    } catch (reason) {
+      setError(String(reason));
+    }
+  }
+
+  async function toggleSensitive(id: string) {
+    const current = snippets.find((s) => s.id === id);
+    if (!current) return;
+    try {
+      const updated = await setSensitive(id, !current.sensitive);
       setSnippets((prev) => prev.map((s) => (s.id === id ? updated : s)));
       setError(null);
     } catch (reason) {
@@ -434,6 +447,7 @@ export default function App() {
               onToggleBulk={toggleBulk}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
+              onToggleSensitive={toggleSensitive}
               onArchive={handleArchive}
             />
           )}
@@ -448,6 +462,7 @@ export default function App() {
               onToggleBulk={toggleBulk}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
+              onToggleSensitive={toggleSensitive}
               onArchive={handleArchive}
             />
           )}
@@ -462,6 +477,7 @@ export default function App() {
               onToggleBulk={toggleBulk}
               onToggleFavorite={toggleFavorite}
               onTogglePin={togglePin}
+              onToggleSensitive={toggleSensitive}
               onRestore={handleRestore}
               onDelete={handleDelete}
             />

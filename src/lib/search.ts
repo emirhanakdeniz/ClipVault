@@ -50,15 +50,14 @@ function dateCutoff(range: DateRange | undefined): number | null {
 
 /**
  * Case-insensitive substring match over a snippet's title and content.
- * Whitespace-only queries match everything.
+ * Whitespace-only queries match everything. Sensitive snippets match on title
+ * only, so typing secret content into search never confirms or discloses it.
  */
 export function matchesQuery(snippet: Snippet, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return (
-    snippet.title.toLowerCase().includes(q) ||
-    snippet.content.toLowerCase().includes(q)
-  );
+  if (snippet.title.toLowerCase().includes(q)) return true;
+  return !snippet.sensitive && snippet.content.toLowerCase().includes(q);
 }
 
 /**

@@ -22,6 +22,10 @@ pub struct Snippet {
     /// "manual" (created by the user) or "clipboard" (auto-captured).
     #[serde(default = "default_source")]
     pub source: String,
+    /// Sensitive snippets have their content hidden in the UI and are excluded
+    /// from clipboard duplicate matching.
+    #[serde(default)]
+    pub sensitive: bool,
 }
 
 fn default_source() -> String {
@@ -47,12 +51,13 @@ fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
         created_at: row.get(5)?,
         updated_at: row.get(6)?,
         source: row.get(10)?,
+        sensitive: row.get::<_, i64>(11)? != 0,
     })
 }
 
 fn fetch_snippet(conn: &Connection, id: &str) -> Result<Snippet, String> {
     conn.query_row(
-        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source
+        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
          FROM snippets WHERE id = ?1",
         params![id],
         row_to_snippet,
@@ -65,7 +70,7 @@ pub fn list_snippets(db: State<'_, Db>) -> Result<Vec<Snippet>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source
+            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
              FROM snippets ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -97,6 +102,7 @@ pub fn create_snippet(
         created_at: now,
         updated_at: now,
         source: default_source(),
+        sensitive: false,
     };
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
@@ -185,6 +191,21 @@ pub fn set_archived(db: State<'_, Db>, id: String, archived: bool) -> Result<Sni
 }
 
 #[tauri::command]
+pub fn set_sensitive(db: State<'_, Db>, id: String, sensitive: bool) -> Result<Snippet, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let changed = conn
+        .execute(
+            "UPDATE snippets SET sensitive = ?1, updated_at = ?2 WHERE id = ?3",
+            params![sensitive as i64, now_ms(), id],
+        )
+        .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err(format!("snippet {id} not found"));
+    }
+    fetch_snippet(&conn, &id)
+}
+
+#[tauri::command]
 pub fn delete_snippet(db: State<'_, Db>, id: String) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let changed = conn
@@ -213,6 +234,7 @@ struct ExportEntry {
     favorite: bool,
     pinned: bool,
     archived: bool,
+    sensitive: bool,
     tags: Vec<String>,
     created_at: i64,
     updated_at: i64,
@@ -239,6 +261,7 @@ struct ImportEntry {
     favorite: Option<bool>,
     pinned: Option<bool>,
     archived: Option<bool>,
+    sensitive: Option<bool>,
     tags: Option<Vec<String>>,
     created_at: Option<i64>,
     updated_at: Option<i64>,
@@ -261,7 +284,7 @@ pub fn export_snippets(db: State<'_, Db>, path: String) -> Result<usize, String>
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source
+            "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
              FROM snippets ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
@@ -286,6 +309,7 @@ pub fn export_snippets(db: State<'_, Db>, path: String) -> Result<usize, String>
                 favorite: s.favorite,
                 pinned: s.pinned,
                 archived: s.archived,
+                sensitive: s.sensitive,
                 tags: s.tags,
                 created_at: s.created_at,
                 updated_at: s.updated_at,
@@ -327,6 +351,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
         favorite: bool,
         pinned: bool,
         archived: bool,
+        sensitive: bool,
         tags: Vec<String>,
         created_at: i64,
         updated_at: i64,
@@ -376,6 +401,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
             favorite: entry.favorite.unwrap_or(false),
             pinned: entry.pinned.unwrap_or(false),
             archived: entry.archived.unwrap_or(false),
+            sensitive: entry.sensitive.unwrap_or(false),
             tags: entry.tags.clone().unwrap_or_default(),
             created_at: entry.created_at.unwrap_or(now),
             updated_at: entry.updated_at.unwrap_or(now),
@@ -412,8 +438,8 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
             continue;
         }
         tx.execute(
-            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, sensitive, tags, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 entry.id,
                 entry.title,
@@ -422,6 +448,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
                 entry.favorite as i64,
                 entry.pinned as i64,
                 entry.archived as i64,
+                entry.sensitive as i64,
                 serde_json::to_string(&entry.tags).map_err(|e| e.to_string())?,
                 entry.created_at,
                 entry.updated_at
@@ -591,10 +618,13 @@ pub fn capture_clipboard(
     }
 
     // Same whitespace-normalized duplicate rule as manual creation/import.
+    // Sensitive snippets are deliberately excluded from this comparison so
+    // clipboard monitoring never matches against (or reveals the existence of)
+    // protected content.
     let normalized = normalize_content(trimmed);
     let duplicate = {
         let mut stmt = conn
-            .prepare("SELECT id, content FROM snippets")
+            .prepare("SELECT id, content FROM snippets WHERE sensitive = 0")
             .map_err(|e| e.to_string())?;
         let rows = stmt
             .query_map([], |row| {
@@ -631,6 +661,7 @@ pub fn capture_clipboard(
         created_at: now,
         updated_at: now,
         source: "clipboard".to_string(),
+        sensitive: false,
     };
     conn.execute(
         "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source)

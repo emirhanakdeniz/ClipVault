@@ -42,6 +42,10 @@ export function setArchived(
   return invoke<Snippet>("set_archived", { id, archived });
 }
 
+export function setSensitive(id: string, sensitive: boolean): Promise<Snippet> {
+  return invoke<Snippet>("set_sensitive", { id, sensitive });
+}
+
 export function deleteSnippet(id: string): Promise<void> {
   return invoke<void>("delete_snippet", { id });
 }

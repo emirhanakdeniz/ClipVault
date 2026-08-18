@@ -14,6 +14,7 @@ interface ArchiveViewProps {
   onToggleBulk: (id: string) => void;
   onToggleFavorite: (id: string) => void;
   onTogglePin: (id: string) => void;
+  onToggleSensitive?: (id: string) => void;
   onRestore: (id: string) => void;
   onDelete: (id: string) => void;
 }
@@ -28,6 +29,7 @@ export default function ArchiveView({
   onToggleBulk,
   onToggleFavorite,
   onTogglePin,
+  onToggleSensitive,
   onRestore,
   onDelete,
 }: ArchiveViewProps) {
@@ -64,6 +66,7 @@ export default function ArchiveView({
               onToggleBulk={onToggleBulk}
               onToggleFavorite={onToggleFavorite}
               onTogglePin={onTogglePin}
+              onToggleSensitive={onToggleSensitive}
               onRestore={onRestore}
               onDelete={onDelete}
               index={index}
