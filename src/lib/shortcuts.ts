@@ -8,6 +8,7 @@
  */
 export const SHORTCUTS = {
   focusSearch: { combo: "Ctrl+K", description: "Focus search" },
+  focusQuickCapture: { combo: "Ctrl+I", description: "Focus quick capture" },
   newSnippet: { combo: "Ctrl+N", description: "New snippet" },
   copySelected: { combo: "Ctrl+C", description: "Copy selected snippet" },
   toggleFavorite: { combo: "Ctrl+D", description: "Toggle favorite" },

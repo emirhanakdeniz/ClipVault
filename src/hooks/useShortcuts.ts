@@ -7,6 +7,7 @@ import {
 
 export interface ShortcutActions {
   focusSearch: () => void;
+  focusQuickCapture: () => void;
   newSnippet: () => void;
   copySelected: () => void;
   toggleFavorite: () => void;
@@ -32,6 +33,14 @@ export default function useShortcuts(actions: ShortcutActions) {
       if (matchesShortcut(event, SHORTCUTS.focusSearch)) {
         event.preventDefault();
         actions.focusSearch();
+        return;
+      }
+
+      // Quick capture focus also works while typing, so capturing never
+      // requires leaving the keyboard.
+      if (matchesShortcut(event, SHORTCUTS.focusQuickCapture)) {
+        event.preventDefault();
+        actions.focusQuickCapture();
         return;
       }
 

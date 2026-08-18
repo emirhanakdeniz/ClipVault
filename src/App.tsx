@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import NewSnippetForm from "./components/NewSnippetForm";
+import QuickCapture from "./components/QuickCapture";
 import SnippetEditor from "./components/SnippetEditor";
 import SnippetsView from "./views/SnippetsView";
 import FavoritesView from "./views/FavoritesView";
@@ -78,7 +79,7 @@ export default function App() {
     content: string;
     type: SnippetType;
     tags?: string[];
-  }) {
+  }): Promise<boolean> {
     // Prevent accidental duplicates (whitespace-normalized comparison).
     // Existing snippets are never deleted or merged; the form stays open so
     // the user can edit the content or cancel.
@@ -87,7 +88,7 @@ export default function App() {
       setDuplicateNotice(
         `Already saved as “${duplicate.title}” — not saved again.`,
       );
-      return;
+      return false;
     }
     try {
       const created = await createSnippet(input);
@@ -95,8 +96,10 @@ export default function App() {
       setShowForm(false);
       setDuplicateNotice(null);
       setError(null);
+      return true;
     } catch (reason) {
       setError(String(reason));
+      return false;
     }
   }
 
@@ -283,6 +286,10 @@ export default function App() {
   useShortcuts({
     focusSearch: () =>
       document.querySelector<HTMLInputElement>(".searchbar__input")?.focus(),
+    focusQuickCapture: () =>
+      document
+        .querySelector<HTMLInputElement>(".quickcapture__content")
+        ?.focus(),
     newSnippet: () => setShowForm((open) => !open),
     copySelected,
     toggleFavorite: () => {
@@ -318,6 +325,11 @@ export default function App() {
       <main className="content">
         <div className="toolbar">
           <SearchBar query={query} onChange={setQuery} />
+          <QuickCapture
+            onCreate={handleCreate}
+            notice={duplicateNotice}
+            onDismissNotice={() => setDuplicateNotice(null)}
+          />
           <button
             className="toolbar__new"
             type="button"
