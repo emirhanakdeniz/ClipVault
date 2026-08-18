@@ -60,13 +60,17 @@ export function useSnippets() {
     [snippets],
   );
 
-  useEffect(() => {
-    listSnippets()
+  const reloadSnippets = () => {
+    return listSnippets()
       .then((loaded) => {
         setSnippets(loaded);
         setError(null);
       })
       .catch((reason) => setError(String(reason)));
+  };
+
+  useEffect(() => {
+    void reloadSnippets();
   }, []);
 
   async function handleCreate(input: {
@@ -74,6 +78,7 @@ export function useSnippets() {
     content: string;
     type: SnippetType;
     tags?: string[];
+    sensitive?: boolean;
   }): Promise<boolean> {
     const duplicate = findDuplicate(snippets, input.content);
     if (duplicate) {
@@ -355,5 +360,6 @@ export function useSnippets() {
     copySelected,
     handleClipboardCapture,
     handleClipboardRemove,
+    reloadSnippets,
   };
 }

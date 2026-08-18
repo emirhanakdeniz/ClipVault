@@ -8,6 +8,7 @@ interface NewSnippetFormProps {
     content: string;
     type: SnippetType;
     tags: string[];
+    sensitive?: boolean;
   }) => void;
   onCancel: () => void;
   notice?: string | null;
@@ -30,6 +31,7 @@ export default function NewSnippetForm({
   const [content, setContent] = useState("");
   const [type, setType] = useState<SnippetType>("text");
   const [tagsInput, setTagsInput] = useState("");
+  const [sensitive, setSensitive] = useState(false);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -44,6 +46,7 @@ export default function NewSnippetForm({
       content: trimmedContent,
       type,
       tags: [...new Set(tags)],
+      sensitive,
     });
   }
 
@@ -96,6 +99,14 @@ export default function NewSnippetForm({
             </option>
           ))}
         </select>
+        <label className="newsnippet__sensitive-label">
+          <input
+            type="checkbox"
+            checked={sensitive}
+            onChange={(e) => setSensitive(e.target.checked)}
+          />
+          <span>🔒 Sensitive</span>
+        </label>
         <div className="newsnippet__actions">
           <button className="newsnippet__cancel" type="button" onClick={onCancel}>
             Cancel

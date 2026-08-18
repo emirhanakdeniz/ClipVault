@@ -20,5 +20,12 @@ export interface Snippet {
   source: SnippetSource;
   /** Sensitive snippets have their content hidden until explicitly revealed. */
   sensitive: boolean;
+  /** True when the snippet is encrypted and the vault is locked. */
+  locked?: boolean;
+}
+
+export interface EncryptionStatus {
+  configured: boolean;
+  unlocked: boolean;
 }
 

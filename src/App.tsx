@@ -1,3 +1,4 @@
+import { useState } from "react";
 import Sidebar from "./components/Sidebar";
 import SearchBar from "./components/SearchBar";
 import NewSnippetForm from "./components/NewSnippetForm";
@@ -8,13 +9,23 @@ import BulkActionBar from "./components/BulkActionBar";
 import FilterBar from "./components/FilterBar";
 import ShortcutSettings from "./components/ShortcutSettings";
 import ClipboardHistorySettings from "./components/ClipboardHistorySettings";
+import VaultSettings from "./components/VaultSettings";
+import VaultModal, { type VaultModalMode } from "./components/VaultModal";
 import useShortcuts from "./hooks/useShortcuts";
 import useGlobalQuickCapture from "./hooks/useGlobalQuickCapture";
 import useClipboardHistory from "./hooks/useClipboardHistory";
+import { useVault } from "./hooks/useVault";
 import { useSnippets } from "./hooks/useSnippets";
 
 export default function App() {
   const store = useSnippets();
+  const [vaultModalMode, setVaultModalMode] = useState<VaultModalMode | null>(
+    null,
+  );
+
+  const vault = useVault(() => {
+    void store.reloadSnippets();
+  });
 
   useShortcuts({
     focusSearch: () =>
@@ -64,6 +75,13 @@ export default function App() {
         onImport={store.handleImport}
         footerExtra={
           <>
+            <VaultSettings
+              status={vault.status}
+              onOpenModal={(mode) => setVaultModalMode(mode)}
+              onLock={() => {
+                vault.lock().catch((err) => store.setError(String(err)));
+              }}
+            />
             <ShortcutSettings
               setting={globalQuickCapture.setting}
               status={globalQuickCapture.status}
@@ -154,12 +172,21 @@ export default function App() {
             onArchive={store.handleArchive}
             onRestore={store.handleRestore}
             onDelete={store.handleDelete}
+            onUnlockVault={() => setVaultModalMode("unlock")}
           />
         </div>
       </main>
+
+      {vaultModalMode && (
+        <VaultModal
+          mode={vaultModalMode}
+          onClose={() => setVaultModalMode(null)}
+          onSetup={vault.setup}
+          onUnlock={vault.unlock}
+          onChangePassphrase={vault.changePassphrase}
+          onDisable={vault.disable}
+        />
+      )}
     </div>
   );
 }
-
-
-

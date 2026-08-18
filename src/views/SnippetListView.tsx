@@ -19,6 +19,7 @@ export interface SnippetListViewProps {
   onArchive?: (id: string) => void;
   onRestore?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onUnlockVault?: () => void;
 }
 
 const VIEW_METADATA: Record<
@@ -60,6 +61,7 @@ export default function SnippetListView({
   onArchive,
   onRestore,
   onDelete,
+  onUnlockVault,
 }: SnippetListViewProps) {
   const visible = getVisibleSnippets(snippets, query, {
     favoritesOnly: view === "favorites",
@@ -101,6 +103,7 @@ export default function SnippetListView({
               onArchive={view !== "archive" ? onArchive : undefined}
               onRestore={view === "archive" ? onRestore : undefined}
               onDelete={view === "archive" ? onDelete : undefined}
+              onUnlockVault={onUnlockVault}
               index={index}
             />
           ))}

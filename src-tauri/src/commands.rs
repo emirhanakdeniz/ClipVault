@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 use uuid::Uuid;
 
+use crate::crypto::{EncryptionStatus, VaultManager};
 use crate::db::{now_ms, Db};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -26,6 +27,9 @@ pub struct Snippet {
     /// from clipboard duplicate matching.
     #[serde(default)]
     pub sensitive: bool,
+    /// True when the snippet is sensitive, encrypted, and the vault is locked.
+    #[serde(default)]
+    pub locked: bool,
 }
 
 fn default_source() -> String {
@@ -38,8 +42,24 @@ fn decode_tags(raw: String) -> Vec<String> {
     serde_json::from_str(&raw).unwrap_or_default()
 }
 
-fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
-    Ok(Snippet {
+#[allow(dead_code)]
+struct RawSnippet {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+    pub snippet_type: String,
+    pub favorite: bool,
+    pub pinned: bool,
+    pub archived: bool,
+    pub tags: Vec<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub source: String,
+    pub sensitive: bool,
+}
+
+fn row_to_raw_snippet(row: &rusqlite::Row) -> rusqlite::Result<RawSnippet> {
+    Ok(RawSnippet {
         id: row.get(0)?,
         title: row.get(1)?,
         content: row.get(2)?,
@@ -55,17 +75,49 @@ fn row_to_snippet(row: &rusqlite::Row) -> rusqlite::Result<Snippet> {
     })
 }
 
-fn fetch_snippet(conn: &Connection, id: &str) -> Result<Snippet, String> {
+fn fetch_raw_snippet(conn: &Connection, id: &str) -> Result<RawSnippet, String> {
     conn.query_row(
         "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
          FROM snippets WHERE id = ?1",
         params![id],
-        row_to_snippet,
+        row_to_raw_snippet,
     )
     .map_err(|_| format!("snippet {id} not found"))
 }
 
-fn fetch_all_snippets(conn: &Connection) -> Result<Vec<Snippet>, String> {
+fn row_to_snippet(row: &rusqlite::Row, vault: &VaultManager) -> rusqlite::Result<Snippet> {
+    let sensitive = row.get::<_, i64>(11)? != 0;
+    let raw_content: String = row.get(2)?;
+    let (content, locked) = vault.decrypt_from_storage(&raw_content, sensitive);
+
+    Ok(Snippet {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        content,
+        snippet_type: row.get(3)?,
+        favorite: row.get::<_, i64>(4)? != 0,
+        pinned: row.get::<_, i64>(7)? != 0,
+        archived: row.get::<_, i64>(8)? != 0,
+        tags: decode_tags(row.get(9)?),
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
+        source: row.get(10)?,
+        sensitive,
+        locked,
+    })
+}
+
+fn fetch_snippet(conn: &Connection, vault: &VaultManager, id: &str) -> Result<Snippet, String> {
+    conn.query_row(
+        "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
+         FROM snippets WHERE id = ?1",
+        params![id],
+        |row| row_to_snippet(row, vault),
+    )
+    .map_err(|_| format!("snippet {id} not found"))
+}
+
+fn fetch_all_snippets(conn: &Connection, vault: &VaultManager) -> Result<Vec<Snippet>, String> {
     let mut stmt = conn
         .prepare(
             "SELECT id, title, content, type, favorite, created_at, updated_at, pinned, archived, tags, source, sensitive
@@ -73,7 +125,7 @@ fn fetch_all_snippets(conn: &Connection) -> Result<Vec<Snippet>, String> {
         )
         .map_err(|e| e.to_string())?;
     let rows = stmt
-        .query_map([], row_to_snippet)
+        .query_map([], |row| row_to_snippet(row, vault))
         .map_err(|e| e.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())
@@ -81,6 +133,7 @@ fn fetch_all_snippets(conn: &Connection) -> Result<Vec<Snippet>, String> {
 
 fn update_snippet_flag(
     conn: &Connection,
+    vault: &VaultManager,
     id: &str,
     column: &str,
     value: bool,
@@ -95,23 +148,37 @@ fn update_snippet_flag(
     if changed == 0 {
         return Err(format!("snippet {id} not found"));
     }
-    fetch_snippet(conn, id)
+    fetch_snippet(conn, vault, id)
 }
 
 #[tauri::command]
-pub fn list_snippets(db: State<'_, Db>) -> Result<Vec<Snippet>, String> {
+pub fn list_snippets(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+) -> Result<Vec<Snippet>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    fetch_all_snippets(&conn)
+    fetch_all_snippets(&conn, &vault)
 }
 
 #[tauri::command]
 pub fn create_snippet(
     db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
     title: String,
     content: String,
     snippet_type: String,
     tags: Option<Vec<String>>,
+    sensitive: Option<bool>,
 ) -> Result<Snippet, String> {
+    let is_sensitive = sensitive.unwrap_or(false);
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+    let stored_content = if is_sensitive {
+        vault.encrypt_for_storage(&conn, &content)?
+    } else {
+        content.clone()
+    };
+
     let now = now_ms();
     let snippet = Snippet {
         id: Uuid::new_v4().to_string(),
@@ -125,16 +192,16 @@ pub fn create_snippet(
         created_at: now,
         updated_at: now,
         source: default_source(),
-        sensitive: false,
+        sensitive: is_sensitive,
+        locked: false,
     };
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         params![
             snippet.id,
             snippet.title,
-            snippet.content,
+            stored_content,
             snippet.snippet_type,
             snippet.favorite as i64,
             snippet.pinned as i64,
@@ -153,45 +220,110 @@ pub fn create_snippet(
 #[tauri::command]
 pub fn update_snippet(
     db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
     id: String,
     title: String,
     content: String,
 ) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let current = fetch_raw_snippet(&conn, &id)?;
+
+    let stored_content = if current.sensitive {
+        vault.encrypt_for_storage(&conn, &content)?
+    } else {
+        content
+    };
+
     let changed = conn
         .execute(
             "UPDATE snippets SET title = ?1, content = ?2, updated_at = ?3 WHERE id = ?4",
-            params![title, content, now_ms(), id],
+            params![title, stored_content, now_ms(), id],
         )
         .map_err(|e| e.to_string())?;
     if changed == 0 {
         return Err(format!("snippet {id} not found"));
     }
-    fetch_snippet(&conn, &id)
+    fetch_snippet(&conn, &vault, &id)
 }
 
 #[tauri::command]
-pub fn set_favorite(db: State<'_, Db>, id: String, favorite: bool) -> Result<Snippet, String> {
+pub fn set_favorite(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    id: String,
+    favorite: bool,
+) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    update_snippet_flag(&conn, &id, "favorite", favorite)
+    update_snippet_flag(&conn, &vault, &id, "favorite", favorite)
 }
 
 #[tauri::command]
-pub fn set_pinned(db: State<'_, Db>, id: String, pinned: bool) -> Result<Snippet, String> {
+pub fn set_pinned(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    id: String,
+    pinned: bool,
+) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    update_snippet_flag(&conn, &id, "pinned", pinned)
+    update_snippet_flag(&conn, &vault, &id, "pinned", pinned)
 }
 
 #[tauri::command]
-pub fn set_archived(db: State<'_, Db>, id: String, archived: bool) -> Result<Snippet, String> {
+pub fn set_archived(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    id: String,
+    archived: bool,
+) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    update_snippet_flag(&conn, &id, "archived", archived)
+    update_snippet_flag(&conn, &vault, &id, "archived", archived)
 }
 
 #[tauri::command]
-pub fn set_sensitive(db: State<'_, Db>, id: String, sensitive: bool) -> Result<Snippet, String> {
+pub fn set_sensitive(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    id: String,
+    sensitive: bool,
+) -> Result<Snippet, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    update_snippet_flag(&conn, &id, "sensitive", sensitive)
+    let current = fetch_raw_snippet(&conn, &id)?;
+
+    if current.sensitive == sensitive {
+        return fetch_snippet(&conn, &vault, &id);
+    }
+
+    let new_content = if sensitive {
+        if !VaultManager::is_encrypted(&current.content) {
+            vault.encrypt_for_storage(&conn, &current.content)?
+        } else {
+            current.content
+        }
+    } else {
+        if VaultManager::is_encrypted(&current.content) {
+            let (plain, locked) = vault.decrypt_from_storage(&current.content, true);
+            if locked {
+                return Err(
+                    "Vault is locked. Unlock before removing sensitive status from encrypted snippet."
+                        .to_string(),
+                );
+            }
+            plain
+        } else {
+            current.content
+        }
+    };
+
+    let changed = conn
+        .execute(
+            "UPDATE snippets SET sensitive = ?1, content = ?2, updated_at = ?3 WHERE id = ?4",
+            params![sensitive as i64, new_content, now_ms(), id],
+        )
+        .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err(format!("snippet {id} not found"));
+    }
+    fetch_snippet(&conn, &vault, &id)
 }
 
 #[tauri::command]
@@ -207,11 +339,69 @@ pub fn delete_snippet(db: State<'_, Db>, id: String) -> Result<(), String> {
 }
 
 // ---------------------------------------------------------------------------
+// Vault & Encryption commands
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn get_encryption_status(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+) -> Result<EncryptionStatus, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    vault.get_status(&conn)
+}
+
+#[tauri::command]
+pub fn setup_encryption(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    passphrase: String,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    vault.setup(&conn, &passphrase)
+}
+
+#[tauri::command]
+pub fn unlock_vault(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    passphrase: String,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    vault.unlock(&conn, &passphrase)
+}
+
+#[tauri::command]
+pub fn lock_vault(vault: State<'_, VaultManager>) -> Result<(), String> {
+    vault.lock()
+}
+
+#[tauri::command]
+pub fn change_vault_passphrase(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    old_passphrase: String,
+    new_passphrase: String,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    vault.change_passphrase(&conn, &old_passphrase, &new_passphrase)
+}
+
+#[tauri::command]
+pub fn disable_encryption(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    passphrase: String,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    vault.disable_encryption(&conn, &passphrase)
+}
+
+// ---------------------------------------------------------------------------
 // Import / export
 // ---------------------------------------------------------------------------
 
-/// Single entry inside an export file. Tags are exported as an empty list for
-/// forward compatibility until tagging exists in the data model.
+/// Single entry inside an export file.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ExportEntry {
@@ -269,9 +459,20 @@ pub struct ImportResult {
 }
 
 #[tauri::command]
-pub fn export_snippets(db: State<'_, Db>, path: String) -> Result<usize, String> {
+pub fn export_snippets(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    path: String,
+) -> Result<usize, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let snippets = fetch_all_snippets(&conn)?;
+    let snippets = fetch_all_snippets(&conn, &vault)?;
+
+    if snippets.iter().any(|s| s.locked) {
+        return Err(
+            "Vault is locked. Unlock the vault before exporting snippets to ensure sensitive data is not locked out."
+                .to_string(),
+        );
+    }
 
     let file = ExportFile {
         format: "clipvault-export",
@@ -307,7 +508,11 @@ fn normalize_content(content: &str) -> String {
 }
 
 #[tauri::command]
-pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, String> {
+pub fn import_snippets(
+    db: State<'_, Db>,
+    vault: State<'_, VaultManager>,
+    path: String,
+) -> Result<ImportResult, String> {
     let raw = std::fs::read_to_string(&path)
         .map_err(|e| format!("cannot read file: {e}"))?;
     let file: ImportFile =
@@ -318,9 +523,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
         _ => return Err("file contains no snippets".to_string()),
     };
 
-    // 1. Validate every entry before touching the database. A single
-    //    malformed entry rejects the whole import, so existing data can
-    //    never be partially corrupted.
+    // 1. Validate every entry before touching the database.
     struct ValidEntry {
         id: String,
         title: String,
@@ -391,7 +594,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
     // 2. Collect what is already stored so duplicates are skipped instead of
     //    re-imported (no overwrites, no merges).
     let mut stmt = conn
-        .prepare("SELECT id, content FROM snippets")
+        .prepare("SELECT id, content FROM snippets WHERE sensitive = 0")
         .map_err(|e| e.to_string())?;
     let existing: Vec<(String, String)> = stmt
         .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
@@ -415,13 +618,20 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
             skipped += 1;
             continue;
         }
+
+        let stored_content = if entry.sensitive {
+            vault.encrypt_for_storage(&tx, &entry.content)?
+        } else {
+            entry.content
+        };
+
         tx.execute(
             "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, sensitive, tags, created_at, updated_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
             params![
                 entry.id,
                 entry.title,
-                entry.content,
+                stored_content,
                 entry.snippet_type,
                 entry.favorite as i64,
                 entry.pinned as i64,
@@ -434,7 +644,9 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
         )
         .map_err(|e| e.to_string())?;
         seen_ids.insert(entry.id);
-        seen_contents.insert(normalized);
+        if !entry.sensitive {
+            seen_contents.insert(normalized);
+        }
         imported += 1;
     }
     tx.commit().map_err(|e| e.to_string())?;
@@ -442,8 +654,7 @@ pub fn import_snippets(db: State<'_, Db>, path: String) -> Result<ImportResult, 
     Ok(ImportResult { imported, skipped })
 }
 
-/// Reads a value from the generic settings table. Returns None when the key
-/// has never been written (e.g. first run after the feature was added).
+/// Reads a value from the generic settings table.
 #[tauri::command]
 pub fn get_setting(db: State<'_, Db>, key: String) -> Result<Option<String>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -508,15 +719,11 @@ fn read_clipboard_setting(conn: &Connection) -> ClipboardHistorySetting {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CaptureOutcome {
-    /// The snippet captured this round, if the clipboard changed.
     pub created: Option<Snippet>,
-    /// Clipboard entries removed by the limit, if any.
     pub removed_ids: Vec<String>,
-    /// False when capture is disabled; the frontend then skips state updates.
     pub enabled: bool,
 }
 
-/// Shortens the first non-empty line of captured text into a title.
 fn title_from_content(content: &str) -> String {
     let first_line = content
         .lines()
@@ -530,9 +737,6 @@ fn title_from_content(content: &str) -> String {
     title
 }
 
-/// Deletes the oldest auto-captured entries that exceed `limit`.
-/// Manual snippets and favorites/pinned entries are never touched; when all
-/// remaining captured entries are protected the prune is best-effort.
 fn prune_clipboard_entries(conn: &Connection, limit: usize) -> Result<Vec<String>, String> {
     let total: i64 = conn
         .query_row(
@@ -566,9 +770,6 @@ fn prune_clipboard_entries(conn: &Connection, limit: usize) -> Result<Vec<String
     Ok(removed)
 }
 
-/// Poll target for the frontend: reads the system clipboard, stores new text
-/// as a "clipboard" snippet (skipping duplicates and empty text), then prunes
-/// auto-captured entries over the configured limit.
 #[tauri::command]
 pub fn capture_clipboard(
     app: AppHandle,
@@ -597,7 +798,6 @@ pub fn capture_clipboard(
         });
     }
 
-    // Fast-path in-memory check: if clipboard content hasn't changed since last poll, skip DB queries.
     if let Ok(last) = LAST_SEEN_CLIPBOARD.lock() {
         if let Some(ref prev) = *last {
             if prev == trimmed {
@@ -614,10 +814,6 @@ pub fn capture_clipboard(
         *last = Some(trimmed.to_string());
     }
 
-    // Same whitespace-normalized duplicate rule as manual creation/import.
-    // Sensitive snippets are deliberately excluded from this comparison so
-    // clipboard monitoring never matches against (or reveals the existence of)
-    // protected content.
     let normalized = normalize_content(trimmed);
     let latest_duplicate = conn
         .query_row(
@@ -666,6 +862,7 @@ pub fn capture_clipboard(
         updated_at: now,
         source: "clipboard".to_string(),
         sensitive: false,
+        locked: false,
     };
     conn.execute(
         "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
@@ -694,8 +891,6 @@ pub fn capture_clipboard(
     })
 }
 
-/// Trims existing auto-captured history down to the configured limit. Called
-/// by the frontend right after the limit setting changes.
 #[tauri::command]
 pub fn prune_clipboard_history(db: State<'_, Db>) -> Result<Vec<String>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -723,7 +918,7 @@ mod tests {
 
         let long_line = "a".repeat(100);
         let title = title_from_content(&long_line);
-        assert_eq!(title.chars().count(), 61); // 60 chars + ellipsis
+        assert_eq!(title.chars().count(), 61);
         assert!(title.ends_with('…'));
     }
 
@@ -731,6 +926,7 @@ mod tests {
     fn test_crud_and_flag_updates() {
         let conn = Connection::open_in_memory().unwrap();
         setup_schema(&conn).unwrap();
+        let vault = VaultManager::new();
 
         let id = "test-snippet-1";
         let now = now_ms();
@@ -740,23 +936,71 @@ mod tests {
             params![id, "Test Title", "Test Content", "text", now],
         ).unwrap();
 
-        let snippet = fetch_snippet(&conn, id).unwrap();
+        let snippet = fetch_snippet(&conn, &vault, id).unwrap();
         assert_eq!(snippet.title, "Test Title");
         assert!(!snippet.favorite);
         assert!(!snippet.pinned);
 
-        // Update flags
-        let updated = update_snippet_flag(&conn, id, "favorite", true).unwrap();
+        let updated = update_snippet_flag(&conn, &vault, id, "favorite", true).unwrap();
         assert!(updated.favorite);
 
-        let updated = update_snippet_flag(&conn, id, "pinned", true).unwrap();
+        let updated = update_snippet_flag(&conn, &vault, id, "pinned", true).unwrap();
         assert!(updated.pinned);
 
-        let updated = update_snippet_flag(&conn, id, "sensitive", true).unwrap();
-        assert!(updated.sensitive);
-
-        let all = fetch_all_snippets(&conn).unwrap();
+        let all = fetch_all_snippets(&conn, &vault).unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].id, id);
+    }
+
+    #[test]
+    fn test_sensitive_snippets_encryption_and_locking() {
+        let conn = Connection::open_in_memory().unwrap();
+        setup_schema(&conn).unwrap();
+        let vault = VaultManager::new();
+
+        // 1. Setup encryption with vault
+        vault.setup(&conn, "super-passphrase").unwrap();
+
+        // 2. Insert normal snippet and sensitive snippet
+        let normal_id = "normal-1";
+        let sensitive_id = "sensitive-1";
+        let now = now_ms();
+
+        conn.execute(
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
+             VALUES (?1, ?2, ?3, 'text', 0, 0, 0, '[]', ?4, ?4, 'manual', 0)",
+            params![normal_id, "Normal Title", "Normal Plain Content", now],
+        ).unwrap();
+
+        let encrypted_content = vault.encrypt_for_storage(&conn, "Secret Database Password 123!").unwrap();
+        conn.execute(
+            "INSERT INTO snippets (id, title, content, type, favorite, pinned, archived, tags, created_at, updated_at, source, sensitive)
+             VALUES (?1, ?2, ?3, 'text', 0, 0, 0, '[]', ?4, ?4, 'manual', 1)",
+            params![sensitive_id, "Secret Title", encrypted_content, now],
+        ).unwrap();
+
+        // 3. When vault is unlocked, both are accessible
+        let list_unlocked = fetch_all_snippets(&conn, &vault).unwrap();
+        assert_eq!(list_unlocked.len(), 2);
+        let sensitive_unlocked = list_unlocked.iter().find(|s| s.id == sensitive_id).unwrap();
+        assert_eq!(sensitive_unlocked.content, "Secret Database Password 123!");
+        assert!(!sensitive_unlocked.locked);
+
+        // 4. When vault is locked, normal snippet is unaffected, sensitive snippet is locked
+        vault.lock().unwrap();
+        let list_locked = fetch_all_snippets(&conn, &vault).unwrap();
+        let normal_item = list_locked.iter().find(|s| s.id == normal_id).unwrap();
+        assert_eq!(normal_item.content, "Normal Plain Content");
+        assert!(!normal_item.locked);
+
+        let sensitive_item = list_locked.iter().find(|s| s.id == sensitive_id).unwrap();
+        assert!(sensitive_item.locked);
+        assert_eq!(sensitive_item.content, "[Locked sensitive snippet]");
+
+        // 5. Unlock again
+        vault.unlock(&conn, "super-passphrase").unwrap();
+        let sensitive_restored = fetch_snippet(&conn, &vault, sensitive_id).unwrap();
+        assert!(!sensitive_restored.locked);
+        assert_eq!(sensitive_restored.content, "Secret Database Password 123!");
     }
 }

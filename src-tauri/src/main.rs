@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod crypto;
 mod db;
 
 use tauri::Manager;
@@ -14,6 +15,7 @@ fn main() {
         .setup(|app| {
             let database = db::init(app.handle())?;
             app.manage(database);
+            app.manage(crypto::VaultManager::new());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -31,8 +33,13 @@ fn main() {
             commands::set_setting,
             commands::capture_clipboard,
             commands::prune_clipboard_history,
+            commands::get_encryption_status,
+            commands::setup_encryption,
+            commands::unlock_vault,
+            commands::lock_vault,
+            commands::change_vault_passphrase,
+            commands::disable_encryption,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
-

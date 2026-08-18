@@ -15,6 +15,7 @@ interface SnippetCardProps {
   onArchive?: (id: string) => void;
   onRestore?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onUnlockVault?: () => void;
   index: number;
 }
 
@@ -30,6 +31,7 @@ export default function SnippetCard({
   onArchive,
   onRestore,
   onDelete,
+  onUnlockVault,
   index,
 }: SnippetCardProps) {
   const [copied, setCopied] = useState(false);
@@ -44,9 +46,13 @@ export default function SnippetCard({
 
   useEffect(() => {
     setRevealed(false);
-  }, [snippet.id, snippet.sensitive]);
+  }, [snippet.id, snippet.sensitive, snippet.locked]);
 
   function handleCopy() {
+    if (snippet.locked) {
+      onUnlockVault?.();
+      return;
+    }
     copyText(snippet.content).then((ok) => {
       if (!ok) {
         // Clipboard access denied (e.g. non-secure context); no-op.
@@ -177,7 +183,26 @@ export default function SnippetCard({
           )}
         </div>
       </header>
-      {snippet.sensitive && !revealed ? (
+      {snippet.sensitive && snippet.locked ? (
+        <div className="card__masked card__masked--locked">
+          <span className="card__masked-dots" aria-hidden="true">
+            ••••••••••••
+          </span>
+          <span className="card__masked-note">Encrypted & locked</span>
+          {onUnlockVault && (
+            <button
+              type="button"
+              className="card__reveal card__reveal--unlock"
+              onClick={(event) => {
+                event.stopPropagation();
+                onUnlockVault();
+              }}
+            >
+              Unlock
+            </button>
+          )}
+        </div>
+      ) : snippet.sensitive && !revealed ? (
         <div className="card__masked">
           <span className="card__masked-dots" aria-hidden="true">
             ••••••••••••
