@@ -19,10 +19,12 @@ import useClipboardHistory from "./hooks/useClipboardHistory";
 import { useVault } from "./hooks/useVault";
 import { useSnippets } from "./hooks/useSnippets";
 import { useTheme } from "./hooks/useTheme";
+import { useAutostart } from "./hooks/useAutostart";
 
 export default function App() {
   const store = useSnippets();
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const autostart = useAutostart();
   const [vaultModalMode, setVaultModalMode] = useState<VaultModalMode | null>(
     null,
   );
@@ -166,6 +168,7 @@ export default function App() {
               onImport={store.handleImport}
               globalQuickCapture={globalQuickCapture}
               clipboardHistory={clipboardHistory}
+              autostart={autostart}
             />
           ) : store.activeView === "statistics" ? (
             <StatisticsView

@@ -8,6 +8,7 @@ import {
   IconLockOpen,
   IconCopy,
   IconArchive,
+  IconSettings,
 } from "../components/Icons";
 import ShortcutSettings from "../components/ShortcutSettings";
 import ClipboardHistorySettings from "../components/ClipboardHistorySettings";
@@ -17,6 +18,7 @@ import type {
   ClipboardHistorySetting,
 } from "../lib/settings";
 import type { GlobalShortcutStatus } from "../hooks/useGlobalQuickCapture";
+import type { UseAutostartResult } from "../hooks/useAutostart";
 
 interface SettingsViewProps {
   theme: ThemeMode;
@@ -37,6 +39,7 @@ interface SettingsViewProps {
     setting: ClipboardHistorySetting;
     update: (next: ClipboardHistorySetting) => Promise<void>;
   };
+  autostart: UseAutostartResult;
 }
 
 export default function SettingsView({
@@ -50,6 +53,7 @@ export default function SettingsView({
   onImport,
   globalQuickCapture,
   clipboardHistory,
+  autostart,
 }: SettingsViewProps) {
   const isMac =
     typeof navigator !== "undefined" &&
@@ -327,7 +331,51 @@ export default function SettingsView({
         </div>
       </section>
 
-      {/* 6. Data & Backups */}
+      {/* 6. System & Startup */}
+      <section className="settings-card">
+        <div className="settings-card__header">
+          <span className="settings-card__icon">
+            <IconSettings size={18} />
+          </span>
+          <div>
+            <h3 className="settings-card__title">System &amp; Startup</h3>
+            <p className="settings-card__description">
+              Control Windows startup behavior and background execution
+            </p>
+          </div>
+        </div>
+
+        <div className="settings-toggle-row">
+          <div className="settings-toggle-info">
+            <span className="settings-toggle-title">
+              Start with Windows
+            </span>
+            <span className="settings-toggle-description">
+              Automatically launch ClipVault minimized in the background on startup so your clipboard and shortcuts are immediately ready. Default: Off.
+            </span>
+            <span className="settings-toggle-badge">
+              ⚡ Near-zero background footprint: 0% idle CPU and lightweight memory usage.
+            </span>
+          </div>
+          <label className="switch-toggle" aria-label="Toggle Start with Windows">
+            <input
+              type="checkbox"
+              checked={autostart.enabled}
+              disabled={autostart.loading}
+              onChange={(e) => void autostart.toggle(e.target.checked)}
+            />
+            <span className="switch-toggle__slider" />
+          </label>
+        </div>
+
+        {autostart.error && (
+          <div className="error-banner" role="alert">
+            {autostart.error}
+          </div>
+        )}
+      </section>
+
+      {/* 7. Data & Backups */}
       <section className="settings-card">
         <div className="settings-card__header">
           <span className="settings-card__icon">

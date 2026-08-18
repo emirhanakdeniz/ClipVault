@@ -12,10 +12,23 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]),
+        ))
         .setup(|app| {
             let database = db::init(app.handle())?;
             app.manage(database);
             app.manage(crypto::VaultManager::new());
+
+            // If launched at system boot via --autostart, start minimized in the background.
+            let is_autostart = std::env::args().any(|arg| arg == "--autostart");
+            if is_autostart {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.minimize();
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
