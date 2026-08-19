@@ -18,6 +18,10 @@
   <img src="https://img.shields.io/badge/License-PolyForm--Noncommercial--1.0.0-orange.svg" alt="License: PolyForm Noncommercial 1.0.0" />
 </p>
 
+<p align="center">
+  <img src="screenshots/snippets-view.png" alt="ClipVault Preview" width="580" />
+</p>
+
 ---
 
 ## Overview
@@ -25,6 +29,15 @@
 **ClipVault** is designed for one job: capturing, organizing, and retrieving everything you copy — instantly and privately.
 
 Instead of losing copied text to the void of the system clipboard or trusting third-party cloud services with your snippets and credentials, ClipVault automatically records your clipboard history, lets you save and tag reusable snippets, and puts everything one keystroke away. All data lives in an embedded local **SQLite** database with zero telemetry, zero network calls, and optional **AES-256-GCM encryption** for sensitive entries.
+
+---
+
+## Screenshots
+
+| 📋 Snippets & Quick Capture | 📊 Local Statistics | ⚙️ Settings & Vault |
+| :---: | :---: | :---: |
+| <a href="screenshots/snippets-view.png"><img src="screenshots/snippets-view.png" alt="Snippets View" width="260" /></a> | <a href="screenshots/statistics-view.png"><img src="screenshots/statistics-view.png" alt="Statistics View" width="260" /></a> | <a href="screenshots/settings-view.png"><img src="screenshots/settings-view.png" alt="Settings View" width="260" /></a> |
+| *Search, tags & masked secrets* | *Zero-telemetry analytics* | *AES-256-GCM vault & backups* |
 
 ---
 
@@ -108,6 +121,7 @@ flowchart TD
 
 ```text
 ClipVault/
+├── screenshots/                # Application preview screenshots
 ├── public/                     # Static assets (app icon, favicons)
 ├── src/                        # Frontend React application
 │   ├── components/             # UI components
