@@ -97,7 +97,7 @@ export default function SnippetCard({
   return (
     <article
       ref={cardRef}
-      className={selected ? "card card--selected" : "card"}
+      className={`card${selected ? " card--selected" : ""}${bulkSelected ? " card--bulk-selected" : ""}${snippet.pinned ? " card--pinned" : ""}${snippet.sensitive ? " card--sensitive" : ""}${snippet.locked ? " card--locked" : ""}`}
       onClick={() => onSelect?.(snippet.id)}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -108,6 +108,7 @@ export default function SnippetCard({
       role="button"
       aria-label={`Snippet: ${snippet.title}`}
       data-index={index}
+      aria-pressed={selected}
     >
       <header className="card__header">
         {onToggleBulk && (

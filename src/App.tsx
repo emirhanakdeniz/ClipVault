@@ -9,9 +9,6 @@ import StatisticsView from "./views/StatisticsView";
 import SettingsView from "./views/SettingsView";
 import BulkActionBar from "./components/BulkActionBar";
 import FilterBar from "./components/FilterBar";
-import ShortcutSettings from "./components/ShortcutSettings";
-import ClipboardHistorySettings from "./components/ClipboardHistorySettings";
-import VaultSettings from "./components/VaultSettings";
 import VaultModal, { type VaultModalMode } from "./components/VaultModal";
 import ContextMenu, { type ContextMenuPosition } from "./components/ContextMenu";
 import ShortcutsHelpModal from "./components/ShortcutsHelpModal";
@@ -22,6 +19,8 @@ import { useVault } from "./hooks/useVault";
 import { useSnippets } from "./hooks/useSnippets";
 import { useTheme } from "./hooks/useTheme";
 import { useAutostart } from "./hooks/useAutostart";
+import ConfirmDialog from "./components/ConfirmDialog";
+import NotificationRegion from "./components/NotificationRegion";
 
 export default function App() {
   const store = useSnippets();
@@ -34,6 +33,7 @@ export default function App() {
     null,
   );
   const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<{ kind: "single"; id: string } | { kind: "bulk" } | null>(null);
 
   const vault = useVault(() => {
     void store.reloadSnippets();
@@ -62,7 +62,7 @@ export default function App() {
     archiveSelected: () => {
       if (store.selectedId) {
         if (store.activeView === "archive") {
-          void store.handleDelete(store.selectedId);
+          setPendingDelete({ kind: "single", id: store.selectedId });
         } else {
           void store.handleArchive(store.selectedId);
         }
@@ -118,25 +118,12 @@ export default function App() {
         onImport={store.handleImport}
         onOpenShortcutsHelp={() => setShortcutsHelpOpen(true)}
         footerExtra={
-          <>
-            <VaultSettings
-              status={vault.status}
-              onOpenModal={(mode) => setVaultModalMode(mode)}
-              onLock={() => {
-                vault.lock().catch((err) => store.setError(String(err)));
-              }}
-            />
-            <ShortcutSettings
-              setting={globalQuickCapture.setting}
-              status={globalQuickCapture.status}
-              message={globalQuickCapture.message}
-              onChange={globalQuickCapture.update}
-            />
-            <ClipboardHistorySettings
-              setting={clipboardHistory.setting}
-              onChange={clipboardHistory.update}
-            />
-          </>
+          <div className="sidebar-status" aria-label="System status">
+            <div className="sidebar-status__row"><span>Vault</span><strong>{!vault.status.configured ? "Not set" : vault.status.unlocked ? "Unlocked" : "Locked"}</strong></div>
+            <div className="sidebar-status__row"><span>Shortcut</span><strong>{globalQuickCapture.setting.enabled ? "On" : "Off"}</strong></div>
+            <div className="sidebar-status__row"><span>History</span><strong>{clipboardHistory.setting.enabled ? "On" : "Off"}</strong></div>
+            <button type="button" className="sidebar-status__manage" onClick={() => store.setActiveView("settings")}>Manage</button>
+          </div>
         }
       />
       <main className="content">
@@ -183,16 +170,12 @@ export default function App() {
             onClose={() => store.setSelectedId(null)}
           />
         )}
-        {store.statusNotice && (
-          <div className="status-banner" role="status">
-            {store.statusNotice}
-          </div>
-        )}
-        {store.error && (
-          <div className="error-banner" role="alert">
-            {store.error}
-          </div>
-        )}
+        <NotificationRegion
+          success={store.statusNotice}
+          error={store.error}
+          onDismissSuccess={() => store.setStatusNotice(null)}
+          onDismissError={() => store.setError(null)}
+        />
         <div className="view">
           {store.activeView === "settings" ? (
             <SettingsView
@@ -223,7 +206,7 @@ export default function App() {
                 onSetFavorite={store.bulkSetFavorite}
                 onArchive={store.bulkArchive}
                 onRestore={store.bulkRestore}
-                onDelete={store.bulkDelete}
+                onDelete={() => setPendingDelete({ kind: "bulk" })}
                 onClear={() => store.setBulkIds([])}
               />
               <SnippetListView
@@ -240,7 +223,7 @@ export default function App() {
                 onToggleSensitive={store.toggleSensitive}
                 onArchive={store.handleArchive}
                 onRestore={store.handleRestore}
-                onDelete={store.handleDelete}
+                onDelete={(id) => setPendingDelete({ kind: "single", id })}
                 onUnlockVault={() => setVaultModalMode("unlock")}
                 onCopy={store.trackCopy}
                 onContextMenu={(event, snippet) =>
@@ -277,7 +260,7 @@ export default function App() {
           onToggleSensitive={store.toggleSensitive}
           onArchive={store.handleArchive}
           onRestore={store.handleRestore}
-          onDelete={store.handleDelete}
+          onDelete={(id) => setPendingDelete({ kind: "single", id })}
           isArchiveView={store.activeView === "archive"}
         />
       )}
@@ -295,6 +278,19 @@ export default function App() {
           onUnlock={vault.unlock}
           onChangePassphrase={vault.changePassphrase}
           onDisable={vault.disable}
+        />
+      )}
+      {pendingDelete && (
+        <ConfirmDialog
+          title={pendingDelete.kind === "bulk" ? `Delete ${store.bulkIds.length} snippets?` : "Delete this snippet?"}
+          description="This permanently removes the selected item from Archive. This action cannot be undone."
+          confirmLabel="Delete permanently"
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={() => {
+            if (pendingDelete.kind === "bulk") store.bulkDelete();
+            else void store.handleDelete(pendingDelete.id);
+            setPendingDelete(null);
+          }}
         />
       )}
     </div>

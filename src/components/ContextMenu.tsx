@@ -46,6 +46,7 @@ export default function ContextMenu({
   isArchiveView = false,
 }: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const firstItemRef = useRef<HTMLButtonElement>(null);
   const { x, y, snippet } = position;
 
   // Viewport-aware positioning
@@ -55,6 +56,8 @@ export default function ContextMenu({
   const clampedY = Math.max(10, Math.min(y, window.innerHeight - menuHeight - 10));
 
   useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    firstItemRef.current?.focus();
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         onClose();
@@ -65,6 +68,12 @@ export default function ContextMenu({
       if (event.key === "Escape") {
         event.stopPropagation();
         onClose();
+      } else if ((event.key === "ArrowDown" || event.key === "ArrowUp") && menuRef.current) {
+        event.preventDefault();
+        const items = [...menuRef.current.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]')];
+        const current = items.indexOf(document.activeElement as HTMLButtonElement);
+        const delta = event.key === "ArrowDown" ? 1 : -1;
+        items[(current + delta + items.length) % items.length]?.focus();
       }
     }
 
@@ -73,6 +82,7 @@ export default function ContextMenu({
     return () => {
       window.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
     };
   }, [onClose]);
 
@@ -85,6 +95,7 @@ export default function ContextMenu({
       aria-label="Snippet options"
     >
       <button
+        ref={firstItemRef}
         type="button"
         className="context-menu__item"
         role="menuitem"

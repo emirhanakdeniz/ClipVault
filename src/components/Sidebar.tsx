@@ -94,7 +94,8 @@ export default function Sidebar({
                 : "sidebar__item"
             }
             onClick={() => onSelect(item.id)}
-            title={item.title}
+            title={item.title ?? item.label}
+            aria-label={item.label}
             aria-current={item.id === activeView ? "page" : undefined}
           >
             <span className="sidebar__item-icon" aria-hidden="true">
@@ -142,4 +143,3 @@ export default function Sidebar({
     </nav>
   );
 }
-
